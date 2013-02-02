@@ -1,0 +1,21 @@
+#!/bin/bash
+set -eEux -o pipefail
+source lib.tegetype.sh
+
+data_dir=$BASE_DIR/data
+
+usage () {
+    echo "Use: $(basename $0)" >&2
+}
+
+if [ $# -ne 0 ]; then
+    usage
+    exit
+fi
+
+for f in "$data_dir"/*.fa; do
+    if [ -r $f ] && [ -r $f.fai ]; then
+	name=$(basename $f)
+	echo ${name%.fa}
+    fi
+done

@@ -1,0 +1,34 @@
+#!/bin/bash
+set -eEux -o pipefail
+source lib.tegetype.sh
+
+data_dir=$BASE_DIR/data
+
+usage () {
+    echo "Use: $(basename $0) <ref_name> <fasta_file>" >&2
+}
+
+if [ $# -ne 2 ]; then
+    usage
+    exit
+fi
+
+[[ "$1" =~ ^[[:alnum:]_-]*$ ]] || \
+    crash "illegal character in reference name [$1]"
+[ -r "$2" ] || crash "fasta file not found [$2]"
+
+[ ! -e "$data_dir"/$1.fa ] || crash "file exists [$data_dir/$1.fa]"
+[ ! -e "$data_dir"/$1.fa.fai ] || crash "file exists [$data_dir/$1.fa.fai]"
+
+find_my_name_and_dir "$2"
+ln -s "$MY_DIR/$MY_NAME" "$data_dir"/$1.fa
+
+if [ -r "$MY_DIR/$MY_NAME".fai ]; then
+    make_note "using existing faidx file [$MY_DIR/$MY_NAME.fai]"
+    ln -s "$MY_DIR/$MY_NAME".fai "$data_dir"/$1.fa.fai
+else
+    make_note "generating faidx file"
+    samtools faidx "$data_dir"/$1.fa
+fi
+
+make_note "added reference [$1]"

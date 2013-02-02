@@ -1,0 +1,26 @@
+#!/bin/bash
+set -eEux -o pipefail
+source lib.tegetype.sh
+
+data_dir=$BASE_DIR/data
+
+usage () {
+    echo "Use: $(basename $0) <ref_name>" >&2
+}
+
+if [ $# -ne 1 ]; then
+    usage
+    exit
+fi
+
+if [ -h "$data_dir/$1".fa ]; then
+    make_note "removing [$data_dir/$1.fa]"
+    rm "$data_dir/$1".fa
+else
+    crash "reference [$1] was not added with add-ref"
+fi
+
+if [ -r "$data_dir/$1".fa.fai ]; then
+    make_note "removing [$data_dir/$1.fa.fai]"
+    rm "$data_dir/$1".fa.fai
+fi

@@ -1,0 +1,6 @@
+#!/bin/bash -u
+samtools view -H "$1" | grep -E "^@(HD|SQ)"
+for file in "$@"; do
+    samtools view -H $file | grep "^@RG"
+done
+samtools view -H "$1" | grep -E "^@(PG|CO)"

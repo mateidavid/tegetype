@@ -1,0 +1,12 @@
+#!/bin/bash
+this=${BASH_SOURCE[0]}
+while [ -h "$this" ]; do this=$(readlink "$this"); done
+
+version_file=$(dirname "$this")/GIT_VERSION
+if [ -r "$version_file" ]; then
+    version=$(cat "$version_file")
+else
+    version="missing_git_version"
+fi
+
+git describe --always 2>/dev/null || echo "$version"
