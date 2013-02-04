@@ -17,18 +17,21 @@ fi
     crash "illegal character in reference name [$1]"
 [ -r "$2" ] || crash "fasta file not found [$2]"
 
-[ ! -e "$data_dir"/$1.fa ] || crash "file exists [$data_dir/$1.fa]"
-[ ! -e "$data_dir"/$1.fa.fai ] || crash "file exists [$data_dir/$1.fa.fai]"
+ref_fa=$data_dir/ref.$1.fa
+ref_fai=$data_dir/ref.$1.fa.fai
+
+[ ! -e "$ref_fa" ] || crash "file exists [$ref_fa]"
+[ ! -e "$ref_fai" ] || crash "file exists [$ref_fai]"
 
 find_my_name_and_dir "$2"
-ln -s "$MY_DIR/$MY_NAME" "$data_dir"/$1.fa
+ln -s "$MY_DIR/$MY_NAME" "$ref_fa"
 
 if [ -r "$MY_DIR/$MY_NAME".fai ]; then
     make_note "using existing faidx file [$MY_DIR/$MY_NAME.fai]"
-    ln -s "$MY_DIR/$MY_NAME".fai "$data_dir"/$1.fa.fai
+    ln -s "$MY_DIR/$MY_NAME".fai "$ref_fai"
 else
     make_note "generating faidx file"
-    samtools faidx "$data_dir"/$1.fa
+    samtools faidx "$ref_fa"
 fi
 
 make_note "added reference [$1]"

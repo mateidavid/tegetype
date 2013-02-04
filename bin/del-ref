@@ -13,14 +13,17 @@ if [ $# -ne 1 ]; then
     exit
 fi
 
-if [ -h "$data_dir/$1".fa ]; then
-    make_note "removing [$data_dir/$1.fa]"
-    rm "$data_dir/$1".fa
+ref_fa=$data_dir/ref.$1.fa
+ref_fai=$data_dir/ref.$1.fa.fai
+
+if [ -h "$ref_fa" ]; then
+    make_note "removing [$ref_fa]"
+    rm "$ref_fa"
 else
     crash "reference [$1] was not added with add-ref"
 fi
 
-if [ -r "$data_dir/$1".fa.fai ]; then
-    make_note "removing [$data_dir/$1.fa.fai]"
-    rm "$data_dir/$1".fa.fai
+if [ -r "$ref_fai" ]; then
+    make_note "removing [$ref_fai]"
+    rm "$ref_fai"
 fi

@@ -13,9 +13,10 @@ if [ $# -ne 0 ]; then
     exit
 fi
 
-for f in "$data_dir"/*.fa; do
+for f in "$data_dir"/ref.*.fa; do
     if [ -r $f ] && [ -r $f.fai ]; then
 	name=$(basename $f)
+	name=${name#ref.}
 	echo ${name%.fa}
     fi
 done
