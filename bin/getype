@@ -2,14 +2,16 @@
 set -eEux -o pipefail
 source lib.tegetype.sh
 
+ngs_name=$1
+lib_name=$2
+set_lib_var_names "$2"
+check_files_readable "$lib_settings_sh" "$lib_csv" "$lib_fa" \
+    "$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}
+source "$lib_settings_sh"
+set_ref_var_names $ref_name
+check_files_readable "$ref_fa" "$ref_fai"
 
-NGS_NAME=$1
-REF_NAME=$2
-PREFIX=$NGS_NAME.$REF_NAME
-
-REF_SETTINGS=$BASE_DIR/settings/ref.$REF_NAME
-. "$REF_SETTINGS" 2>/dev/null || crash "missing reference settings file: $REF_SETTINGS"
-
+prefix=$ngs_name.$lib_name
 
 #
 # don't trust the user; check most settings
@@ -20,9 +22,6 @@ which samtools >/dev/null 2>&1 || crash "samtools not found"
 which intersectBed >/dev/null 2>&1 || crash "intersectBed not found"
 which bowtie2 >/dev/null 2>&1 || crash "bowtie2 not found"
 [[ "$AWKPATH" =~ $BASE_DIR/bin ]] || crash "AWKPATH not set properly"
-
-[ -r "$REF_FA" ] || crash "reference fasta file missing: $REF_FA"
-[ -r "$CHROMINFO" ] || crash "chrominfo file missing: $CHROMINFO"
 
 
 make_note "using NCPU=$NCPU"
@@ -47,7 +46,7 @@ if need_mappings; then
     ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
     orig_mappings=($(ls $ORIG_MAPPINGS))
 
-    make_note "using reads group(s): [$ORIG_READ_GROUPS]"
+    make_note "using reads group(s): [${ORIG_READ_GROUPS:-}]"
     orig_read_groups=($(echo ${ORIG_READ_GROUPS:-}))
 
     make_note "dropping pairs mapped to different chromosomes: $(([ ${DROP_PAIRS_DIFF_CHR:-} ] && echo "yes") || echo "no")"
@@ -55,18 +54,26 @@ fi
 
 if need_sorted_mappings; then
     sorted_mappings=()
-    for file in ${orig_mappings[@]}; do
-	if (set +o pipefail; zc $file | head -n 1 | grep -q "coordinate"); then
-	    make_note "$file: sorted"
-	    sorted_mappings+=($file)
+    for f in ${orig_mappings[@]}; do
+	if (set +o pipefail; zc $f | head -n 1 | grep -q "coordinate"); then
+	    make_note "$f: sorted"
+	    sorted_mappings+=($f)
 	else
-	    make_note "$file: must sort"
-	    samtools sort -m 10000000000 $file $(basename $file).sort
-	    sorted_mappings+=($(basename $file).sort.bam)
+	    make_note "$f: must sort"
+	    {
+		if (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM"); then
+		    exec samtools reheader <(samtools view -H $f | sam-set-sorted-header) $f
+		else
+		    {
+			sam-header $f | sam-set-sorted-header
+			exec sam-body $f
+		    } | samtools view -Su -
+		fi
+	    } | samtools sort -m 10000000000 - $(basename $f).sort
+	    sorted_mappings+=($(basename $f).sort.bam)
 	fi
     done
 fi
-
 
 get_mappings_by_read_name() {
     file=${orig_mappings[$1]}
@@ -98,28 +105,28 @@ get_mappings_by_read_name() {
 #
 STAGE_NUM=1
 STAGE_NAME="detect pairing information"
-PAIRING_FILE=$PREFIX.pairing
+pairing_file=$prefix.pairing
 INPUT_FILES="$ORIG_MAPPINGS"
-OUTPUT_FILES="$PAIRING_FILE"
+OUTPUT_FILES="$pairing_file"
 STATS_FILE=
 stage_command() {
-    rm -f $PAIRING_FILE.tmp
+    rm -f $pairing_file.tmp
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
-	no_sigpipe get_mappings_by_read_name $i | detect-pairing -f >>$PAIRING_FILE.tmp
+	no_sigpipe get_mappings_by_read_name $i | detect-pairing -f >>$pairing_file.tmp
 	let i+=1
     done
-    sed 's/\(^.*stddev=\([0-9]*\),.*$\)/\1\t\2/' <$PAIRING_FILE.tmp \
+    sed 's/\(^.*stddev=\([0-9]*\),.*$\)/\1\t\2/' <$pairing_file.tmp \
 	| sort -s -k 1,1 -k 4,4n \
 	| cut -f 1-3 \
-	| tawk 'BEGIN{last=""} {if ($1!=last) print; last=$1}' >$PAIRING_FILE.tmp.uniq
-    tawk -v n=$(wc -l <$PAIRING_FILE.tmp.uniq) \
+	| tawk 'BEGIN{last=""} {if ($1!=last) print; last=$1}' >$pairing_file.tmp.uniq
+    tawk -v n=$(wc -l <$pairing_file.tmp.uniq) \
 	'{$2=NR-1; while (length($2)<length(n-1)) $2="0" $2; print}' \
-	<$PAIRING_FILE.tmp.uniq >$PAIRING_FILE
+	<$pairing_file.tmp.uniq >$pairing_file
 }
 run_stage
 
-grep -q "paired=" $PAIRING_FILE || crash "could not determine pairing information"
+grep -q "paired=" $pairing_file || crash "could not determine pairing information"
 
 
 #
@@ -156,7 +163,7 @@ done
 #
 STAGE_NUM=3
 STAGE_NAME="gather evidence for reference allele"
-REF_EVIDENCE=$PREFIX.ref-evidence.csv
+REF_EVIDENCE=$prefix.ref-evidence.csv
 INPUT_FILES=${sorted_mappings[@]}
 OUTPUT_FILES=$REF_EVIDENCE
 STATS_FILE=
@@ -169,9 +176,9 @@ stage_command () {
 	done \
 	    | add-dummy-pairs \
 	    | sam-rsort 2>/dev/null \
-	    | add-extra-sam-flags -N 4 -l $PAIRING_FILE \
-	    | filter-concordant -N 4 -l $PAIRING_FILE 3>/dev/null \
-	    | get-te-evidence -l $PAIRING_FILE \
+	    | add-extra-sam-flags -N 4 -l $pairing_file \
+	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
+	    | get-te-evidence -l $pairing_file \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} >>$REF_EVIDENCE
     done <$TARGETS_CSV
 }
@@ -185,7 +192,7 @@ stage_command () {
 #
 STAGE_NUM=4
 STAGE_NAME="extract discordant reads"
-READS_TO_REMAP=$PREFIX.reads.to_remap
+READS_TO_REMAP=$prefix.reads.to_remap
 INPUT_FILES="$ORIG_MAPPINGS"
 OUTPUT_FILES="$READS_TO_REMAP.*.[12].fq.gz"
 STATS_FILE=
@@ -193,9 +200,9 @@ stage_command () {
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
 	add_dummy_pairs=1 get_orig_mappings $i \
-	    | add-extra-sam-flags -N 4 -l $PAIRING_FILE \
-	    | filter-concordant -N 4 -l $PAIRING_FILE 3>&1 >/dev/null \
-	    | sam-to-fq -s -l $PAIRING_FILE
+	    | add-extra-sam-flags -N 4 -l $pairing_file \
+	    | filter-concordant -N 4 -l $pairing_file 3>&1 >/dev/null \
+	    | sam-to-fq -s -l $pairing_file
 	let i+=1
     done \
 	| fq-trim-illumina-reads -v input_phred=33 \
@@ -204,7 +211,7 @@ stage_command () {
 	| fq-convert -v ofq=tfq \
 	| sed 's/^\(.........\([0-9]\+\):\([12]\):\)/\2.\3\t\1/'
 	| split-file-by-field -r -z --prefix $READS_TO_REMAP. --suffix .tfq.gz \
-	    -d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <$PAIRING_FILE)
+	    -d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <$pairing_file)
 }
 run_stage
 
@@ -217,7 +224,7 @@ run_stage
 #
 STAGE_NUM=5
 STAGE_NAME="mapping to alternate alleles"
-MAPPINGS_TO_ALT=$PREFIX.map.to-alt
+MAPPINGS_TO_ALT=$prefix.map.to-alt
 INPUT_FILES="$READS_TO_REMAP.*.[12].fq.gz"
 OUTPUT_FILES="$MAPPINGS_TO_ALT.*.bam"
 STATS_FILE=
@@ -229,7 +236,7 @@ stage_command() {
 	    -2 <(fq-convert -v ofq=fq $READS_TO_REMAP.${line[0]}.2.tfq.gz) \
 	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} \
 	    | samtools view -Sb - >$MAPPINGS_TO_ALT.${line[0]}.bam
-    done <$PAIRING_FILE
+    done <$pairing_file
 }
 run_stage
 
@@ -242,7 +249,7 @@ run_stage
 #
 STAGE_NUM=6
 STAGE_NAME="sort alternate mappings"
-MAPPINGS_SORT_TO_ALT=$PREFIX.map.sort-to-alt
+MAPPINGS_SORT_TO_ALT=$prefix.map.sort-to-alt
 INPUT_FILES="$MAPPINGS_TO_ALT.*.bam"
 OUTPUT_FILES="$MAPPINGS_SORT_TO_ALT.bam"
 STATS_FILE=
@@ -258,7 +265,7 @@ run_stage
 #
 STAGE_NUM=3
 STAGE_NAME="gather evidence for alternate allele"
-ALT_EVIDENCE=$PREFIX.alt-evidence.csv
+ALT_EVIDENCE=$prefix.alt-evidence.csv
 INPUT_FILES=$MAPPINGS_SORT_TO_ALT.bam
 OUTPUT_FILES=$ALT_EVIDENCE
 STATS_FILE=
@@ -268,9 +275,9 @@ stage_command () {
 	make_note "processing: ${line[@]}"
 	samtools view $MAPPINGS_SORT_TO_ALT.bam ${line[8]}:${line[9]}-${line[10]} \
 	    | sam-rsort 2>/dev/null \
-	    | add-extra-sam-flags -N 4 -P -l $PAIRING_FILE \
-	    | filter-concordant -N 4 -P -l $PAIRING_FILE 3>/dev/null \
-	    | get-te-evidence -P -l $PAIRING_FILE \
+	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
+	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \
+	    | get-te-evidence -P -l $pairing_file \
 	    -t ${line[11]},${line[12]} -t ${line[13]},${line[14]} >>$ALT_EVIDENCE
     done <$TARGETS_CSV
 }

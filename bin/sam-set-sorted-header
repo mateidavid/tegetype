@@ -1,0 +1,2 @@
+#!/bin/bash
+exec tawk '/^@HD/ {for (i=1;i<=NF;i++) {if (substr($i,1,2)=="SO") break;} $i="SO:coordinate";} 1'
