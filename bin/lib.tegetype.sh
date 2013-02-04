@@ -406,6 +406,30 @@ add_to_path () {
     eval $var_name=\"$dir\${$var_name:+:}\$$var_name\"
 }
 
+set_ref_var_names () {
+    ref_fa=$BASE_DIR/data/ref.$1.fa
+    ref_fai=$BASE_DIR/data/ref.$1.fa.fai
+}
+
+set_lib_var_names () {
+    lib_settings_sh=$BASE_DIR/data/lib.$1.settings.sh
+    lib_csv=$BASE_DIR/data/lib.$1.csv
+    lib_fa=$BASE_DIR/data/lib.$1.fa
+    lib_bt2_idx=$BASE_DIR/data/lib.$1
+}
+
+check_files_readable () {
+    for f in "$@"; do
+	[ -r "$f" ] || crash "file not readable [$f]"
+    done
+}
+
+check_files_not_exist () {
+    for f in "$@"; do
+	[ ! -e "$f" ] || crash "file exists [$f]"
+    done
+}
+
 
 #
 # Actually executed

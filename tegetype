@@ -12,7 +12,7 @@ add_to_path "$BASE_DIR"/bin PATH
 export AWKPATH=${AWKPATH:-}
 add_to_path "$BASE_DIR"/bin AWKPATH
 
-prog_list=(add-ref list-ref del-ref add-del add-ins list-tgt del-tgt getype)
+prog_list=(add-ref list-ref del-ref add-lib list-lib del-lib getype)
 
 usage () {
     echo "Use: $(basename "$this") <command> [options]" >&2

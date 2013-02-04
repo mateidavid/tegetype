@@ -1,0 +1,34 @@
+#!/bin/bash
+set -eEux -o pipefail
+source lib.tegetype.sh
+
+data_dir=$BASE_DIR/data
+
+usage () {
+    echo "Use: $(basename $0)" >&2
+}
+
+if [ $# -ne 0 ]; then
+    usage
+    exit
+fi
+
+for f in "$data_dir"/lib.*.csv; do
+    lib_name=$(basename $f)
+    lib_name=${lib_name#lib.}
+    lib_name=${lib_name%.csv}
+    set_lib_var_names "$lib_name"
+
+    have_all=1
+    for g in "$lib_settings_sh" "$lib_csv" "$lib_fa" \
+	"$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}; do
+	if [ ! -r "$g" ]; then
+	    have_all=
+	    break
+	fi
+    done
+    if [ $have_all ]; then
+	source "$lib_settings_sh"
+	print_tab $lib_name $ref_name $max_frag_size
+    fi
+done
