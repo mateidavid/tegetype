@@ -1,0 +1,32 @@
+#!/bin/bash
+set -eEux -o pipefail
+source lib.tegetype.sh
+
+data_dir=$BASE_DIR/data
+
+usage () {
+    echo "Use: $(basename $0) <lib_name>" >&2
+}
+
+if [ $# -ne 1 ]; then
+    usage
+    exit
+fi
+
+set_lib_var_names "$1"
+
+have_all=1
+for g in "$lib_settings_sh" "$lib_csv" "$lib_fa" \
+    "$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}; do
+    if [ ! -r "$g" ]; then
+	have_all=
+	break
+    fi
+done
+[ $have_all ] || crash "library [$1] not added with add-lib"
+
+for g in "$lib_settings_sh" "$lib_csv" "$lib_fa" \
+    "$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}; do
+    make_note "removing [$g]"
+    rm "$g"
+done
