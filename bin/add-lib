@@ -1,6 +1,6 @@
 #!/bin/bash
-set -eEux -o pipefail
 source lib.tegetype.sh
+set -eEux -o pipefail
 
 data_dir=$BASE_DIR/data
 
@@ -42,24 +42,19 @@ tawk -v ref_fai="$ref_fai" <"$3" \
 '
 BEGIN {
   while ((getline < ref_fai) > 0) {
-    print "got contig [" $1 "] with length [" $2 "]"
     len[$1] = $2;
   }
 }
 
 {
   err = 1;
-  if (NF!=7) {
-    print "incorrect number of fields:" >"dev/stderr";
-  } else if (!($1 in len)) {
+  if (!($1 in len)) {
     print "contig [" $1 "] not found in index" >"/dev/stderr";
-  } else if (!($2>=0 && $2<=$3 && $3<=len[$1])) {
+  } else if ($4!="." && !($2>=0 && $2<=$3 && $3<=len[$1])) {
     print "invalid tsd1:" >"/dev/stderr";
-  } else if (!(($4=="." && $5==".") || ($4>=0 && $4<=$5 && $5<=len[$1] && $3<=$4))) {
+  } else if ($4!="." && !($4>=0 && $4<=$5 && $5<=len[$1] && $3<=$4)) {
     print "invalid tsd2:" >"/dev/stderr";
-  } else if (($4=="." && $5==".") == ($6=="*")) {
-    print "line not insertion xor deletion:" >"/dev/stderr";
-  } else if (!($6=="*" || match($6, /^[ACGTacgtNnXx]*$/) > 0)) {
+  } else if (!match($6, /^[ACGTacgtNnXx]*$/) > 0) {
     print "invalid seq:" >"/dev/stderr";
   } else {
     err = 0;
@@ -75,7 +70,7 @@ make_note "individual library entries look ok"
 
 
 # check deletions not overlapping
-tmp=$(intersectBed -c -a <(tawk '$6=="*" {print $1, $2, $5}' <"$3") -b <(tawk '$6=="*" {print $1, $2, $5}' <"$3") | tawk '$NF!=1')
+tmp=$(tawk '$4!="." {print $1, $2, $5}' <"$3" | self-intersect-count | tawk '$NF!=1')
 if [ "$tmp" ]; then
     echo "$tmp"
     make_note "found overlapping deletions";
@@ -85,7 +80,7 @@ fi
 
 
 # check insertions not within 100bp of each other
-tmp=$(intersectBed -c -a <(tawk '$4=="." {print $1, $2, $3}' <"$3") -b <(tawk '$4=="." {print $1, $2, $3}' <"$3" | extend-bed 100) | tawk 'NF!=1')
+tmp=$(tawk '$4=="." {st=$2; end=$3; if (end<st) {st=$3;end=$2}; print $1, st, end}' <"$3" | self-intersect-count -e 100 | tawk '$NF!=1')
 if [ "$tmp" ]; then
     echo "$tmp"
     make_note "found nearby insertions"
@@ -108,7 +103,6 @@ tawk -v lib_name=$1 -v max_frag_size=$max_frag_size -v lib_fa="$lib_fa" \
 '
 BEGIN {
   while ((getline < ref_fai) > 0) {
-    print "got contig [" $1 "] with length [" $2 "]"
     len[$1] = $2;
   }
 }
@@ -116,46 +110,103 @@ BEGIN {
 {
   id = lib_name "_" NR;
 
-  ref_reg_start = $2 - max_frag_size;
-  if (ref_reg_start < 0) ref_reg_start = 0;
-  left_reg_len = $2 - ref_reg_start;
-  if ($4==".") {
-    ref_reg_end = $3 + max_frag_size;
-  } else {
-    ref_reg_end = $5 + max_frag_size;
-  }
-  if (ref_reg_end > len[$1]) ref_reg_end = len[$1];
-  if ($4==".") {
-    right_reg_len = ref_reg_end - $3;
-  } else {
-    right_reg_len = ref_reg_end - $5;
-  }
+  rest = $7;
+  for (i=8; i<=NF; ++i) rest = rest "\t" $i;
 
-  alt_reg_start = 0;
-  alt_tsd1_start = alt_reg_start + left_reg_len;
-  alt_tsd1_end = alt_tsd1_start + ($3 - $2);
-  if ($4 == ".") {
+  if ($4!=".") {
+
+    ref_left_reg_start = $2 - max_frag_size;
+    if (ref_left_reg_start<0) ref_left_reg_start = 0;
+    left_reg_len = $2 - ref_left_reg_start;
+
+    ref_right_reg_end = $5 + max_frag_size;
+    if (ref_right_reg_end > len[$1]) ref_right_reg_end = len[$1];
+    right_reg_len = ref_right_reg_end - $5;
+
+    alt_left_reg_start = 0;
+    alt_tsd1_start = alt_left_reg_start + left_reg_len;
+    alt_tsd1_end = alt_tsd1_start + ($3 - $2);
+    alt_right_reg_end = alt_tsd1_end + right_reg_len;
+
+    print id, $1, ref_left_reg_start, ref_right_reg_end, $2, $3, $4, $5, id, alt_left_reg_start, alt_right_reg_end, alt_tsd1_start, alt_tsd1_end, ".", ".", rest;
+
+    print ">" id >> lib_fa;
+    print ">" id >"/dev/stderr";
+
+    cmd = "samtools faidx " ref_fa " " $1 ":" ref_left_reg_start+1 "-" $3 " | tail -n +2 >>" lib_fa;
+    system(cmd);
+    print cmd >"/dev/stderr";
+
+    cmd = "samtools faidx " ref_fa " " $1 ":" $5+1 "-" ref_right_reg_end " | tail -n +2 >>" lib_fa;
+    system(cmd);
+    print cmd >"/dev/stderr";
+
+  } else if ($4=="." && $3<=$2) {
+
+    ref_left_reg_start = $3 - max_frag_size;
+    if (ref_left_reg_start<0) ref_left_reg_start = 0;
+    left_reg_len = $3 - ref_left_reg_start;
+
+    ref_right_reg_end = $2 + max_frag_size;
+    if (ref_right_reg_end > len[$1]) ref_right_reg_end = len[$1];
+    right_reg_len = ref_right_reg_end - $2;
+
+    alt_left_reg_start = 0;
+    alt_tsd1_start = alt_left_reg_start + left_reg_len;
+    alt_tsd1_end = alt_tsd1_start + ($2 - $3);
     alt_tsd2_start = alt_tsd1_end + length($6);
-    alt_tsd2_end = alt_tsd2_start + ($3 - $2);
-    alt_reg_end = alt_tsd2_end + right_reg_len;
-  } else {
-    alt_tsd2_start = ".";
-    alt_tsd2_end = ".";
-    alt_reg_end = alt_tsd1_end + right_reg_len;
-  }
+    alt_tsd2_end = alt_tsd2_start + ($2 - $3);
+    alt_right_reg_end = alt_tsd2_end + right_reg_len;
 
-  print id, $1, ref_reg_start, ref_reg_end, $2, $3, $4, $5, id, alt_reg_start, alt_reg_end, alt_tsd1_start, alt_tsd1_end, alt_tsd2_start, alt_tsd2_end, $7;
+    print id, $1, ref_left_reg_start, ref_right_reg_end, $3, $2, ".", ".", id, alt_left_reg_start, alt_right_reg_end, alt_tsd1_start, alt_tsd1_end, alt_tsd2_start, alt_tsd2_end, rest;
 
-  print ">" id >> lib_fa;
-  cmd = "samtools faidx " ref_fa " " $1 ":" ref_reg_start+1 "-" $3 " | tail -n +2 >>" lib_fa;
-  system(cmd);
-  if ($4==".") {
+    print ">" id >> lib_fa;
+    print ">" id >"/dev/stderr";
+
+    cmd = "samtools faidx " ref_fa " " $1 ":" ref_left_reg_start+1 "-" $2 " | tail -n +2 >>" lib_fa;
+    system(cmd);
+    print cmd >"/dev/stderr";
+
     print $6 >> lib_fa;
-    cmd = "samtools faidx " ref_fa " " $1 ":" $2+1 "-" ref_reg_end " | tail -n +2 >>" lib_fa;
+    print "print seq >>" lib_fa >"/dev/stderr";
+
+    cmd = "samtools faidx " ref_fa " " $1 ":" $3+1 "-" ref_right_reg_end " | tail -n +2 >>" lib_fa;
     system(cmd);
-  } else {
-    cmd = "samtools faidx " ref_fa " " $1 ":" $5+1 "-" ref_reg_end " | tail -n +2 >>" lib_fa;
+    print cmd >"/dev/stderr";
+
+  } else if ($4=="." && $2<$3) {
+
+    ref_left_reg_start = $2 - max_frag_size;
+    if (ref_left_reg_start<0) ref_left_reg_start = 0;
+    left_reg_len = $2 - ref_left_reg_start;
+
+    ref_right_reg_end = $3 + max_frag_size;
+    if (ref_right_reg_end > len[$1]) ref_right_reg_end = len[$1];
+    right_reg_len = ref_right_reg_end - $3;
+
+    alt_left_reg_start = 0;
+    alt_tsd1_start = alt_left_reg_start + left_reg_len;
+    alt_tsd1_end = alt_tsd1_start;
+    alt_tsd2_start = alt_tsd1_end + length($6);
+    alt_tsd2_end = alt_tsd2_start;
+    alt_right_reg_end = alt_tsd2_end + right_reg_len;
+
+    print id, $1, ref_left_reg_start, ref_right_reg_end, $2, $3, ".", ".", id, alt_left_reg_start, alt_right_reg_end, alt_tsd1_start, alt_tsd1_end, alt_tsd2_start, alt_tsd2_end, rest;
+
+    print ">" id >> lib_fa;
+    print ">" id >"/dev/stderr";
+
+    cmd = "samtools faidx " ref_fa " " $1 ":" ref_left_reg_start+1 "-" $2 " | tail -n +2 >>" lib_fa;
     system(cmd);
+    print cmd >"/dev/stderr";
+
+    print $6 >> lib_fa;
+    print "print seq >>" lib_fa >"/dev/stderr";
+
+    cmd = "samtools faidx " ref_fa " " $1 ":" $3+1 "-" ref_right_reg_end " | tail -n +2 >>" lib_fa;
+    system(cmd);
+    print cmd >"/dev/stderr";
+
   }
 }
 '
