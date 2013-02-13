@@ -23,11 +23,11 @@ done
 shift $(($OPTIND - 1))
 
 splitter () {
-    exec tee-p >(exec cat >&$1)
+    exec tee-p >(exec cat >&$out_fd)
 }
 
 joiner () {
-    exec bedtools intersect $strand -c -a - -b <(exec extend-bed $extension <&$1)
+    exec bedtools intersect $strand -c -a - -b <(exec extend-bed $extension <&$in_fd)
 }
 
 double_pipe

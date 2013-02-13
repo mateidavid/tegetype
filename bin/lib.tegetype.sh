@@ -378,61 +378,39 @@ get_new_fd () {
     echo $i
 }
 
-double_pipe () {
+double_pipe () (
 #    make_note "double_pipe: using elements"
 #    typeset -f main_pipe alt_pipe splitter joiner >&2
     (set +o pipefail; type -t splitter | grep -q function) || crash "$0: splitter undefined"
     (set +o pipefail; type -t joiner | grep -q function) || crash "$0: joiner undefined"
 
-    (
-	close_fds () {
-	    local fd
-	    for fd in ${CLOSE_IN_FDS:-}; do
-		eval "exec $fd<&-"
-	    done
-	    for fd in ${CLOSE_OUT_FDS:-}; do
-		eval "exec $fd>&-"
-	    done
-	}
-	splitter_wrapper () {
-	    close_fds
-	    splitter $1
-	}
-	joiner_wrapper () {
-	    close_fds
-	    joiner $1
-	}
-	pipe_drain_wrapper () {
-	    close_fds
-	    if (set +o pipefail; type -t $1 | grep -q function); then
-		make_note "$1 not empty"
-		$1 | drain
-	    else
-		make_note "$1 empty"
-		exec drain
-	    fi
-	}
+    pipe_drain_wrapper () {
+	if (set +o pipefail; type -t $1 | grep -q function); then
+#		make_note "$1 not empty"
+	    $1 | drain
+	else
+#		make_note "$1 empty"
+	    exec drain
+	fi
+    }
 
-	coproc pipe_drain_wrapper alt_pipe
-	alt_pid=$COPROC_PID
-	out_fd=$(get_new_fd)
-	make_note "using out_fd: $out_fd"
-	eval "exec $out_fd>&${COPROC[1]}-"
-	in_fd=$(get_new_fd)
-	make_note "using in_fd: $in_fd"
-	eval "exec $in_fd<&${COPROC[0]}-"
+    coproc pipe_drain_wrapper alt_pipe
+    alt_pid=$COPROC_PID
+    exec {out_fd}>&${COPROC[1]}-
+#	make_note "using out_fd: $out_fd"
+    exec {in_fd}<&${COPROC[0]}-
+#	make_note "using in_fd: $in_fd"
 
-	CLOSE_IN_FDS=$in_fd splitter_wrapper $out_fd \
-	    | CLOSE_IN_FDS=$in_fd CLOSE_OUT_FDS=$out_fd pipe_drain_wrapper main_pipe \
-	    | CLOSE_OUT_FDS=$out_fd joiner_wrapper $in_fd &
-	main_pid=$!
+    out_fd=$out_fd splitter {in_fd}<&- \
+	| pipe_drain_wrapper main_pipe {in_fd}<&- {out_fd}>&- \
+	| in_fd=$in_fd joiner {out_fd}>&- &
+    main_pid=$!
 
-	eval "exec $out_fd>&-"
-	eval "exec $in_fd<&-"
-	wait $main_pid
-	wait $alt_pid
-    )
-}
+    exec {out_fd}>&-
+    exec {in_fd}<&-
+    wait $main_pid
+    wait $alt_pid
+)
 
 add_to_path () {
     local dir=$1
