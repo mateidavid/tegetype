@@ -1,6 +1,6 @@
 #!/bin/bash
-set -eEux -o pipefail
 source lib.tegetype.sh
+set -eEu -o pipefail
 
 ngs_name=$1
 lib_name=$2
@@ -19,7 +19,7 @@ prefix=$ngs_name.$lib_name
 (which python >/dev/null 2>&1 && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) \
     || crash "python2.6+ not found"
 which samtools >/dev/null 2>&1 || crash "samtools not found"
-which intersectBed >/dev/null 2>&1 || crash "intersectBed not found"
+which bedtools >/dev/null 2>&1 || crash "bedtools not found"
 which bowtie2 >/dev/null 2>&1 || crash "bowtie2 not found"
 [[ "$AWKPATH" =~ $BASE_DIR/bin ]] || crash "AWKPATH not set properly"
 
