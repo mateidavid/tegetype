@@ -415,7 +415,7 @@ double_pipe () (
 add_to_path () {
     local dir=$1
     local var_name=$2
-    [[ ! $(eval echo \$$var_name) =~ "$dir" ]] || return
+    [[ ! $(eval echo \$$var_name) =~ "$dir" ]] || return 0
     eval $var_name=\"$dir\${$var_name:+:}\$$var_name\"
 }
 
