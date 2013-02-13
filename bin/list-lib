@@ -1,6 +1,6 @@
 #!/bin/bash
-set -eEux -o pipefail
 source lib.tegetype.sh
+set -eEu -o pipefail
 
 data_dir=$BASE_DIR/data
 
