@@ -191,6 +191,7 @@ stage_command () {
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} >>$REF_EVIDENCE
     done <$TARGETS_CSV
 }
+run_stage
 
 
 #
@@ -218,7 +219,7 @@ stage_command () {
         | fq-remove-short-paired-reads \
         | fq-rename-paired-reads-with-len \
 	| fq-convert -v ofq=tfq \
-	| sed 's/^\(.........\([0-9]\+\):\([12]\):\)/\2.\3\t\1/'
+	| sed 's/^\(.........\([0-9]\+\):\([12]\):\)/\2.\3\t\1/' \
 	| split-file-by-field -r -z --prefix $READS_TO_REMAP. --suffix .tfq.gz \
 	    -d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <$pairing_file)
 }
