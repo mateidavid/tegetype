@@ -448,10 +448,9 @@ check_files_not_exist () {
 # Actually executed
 #
 set_explicit_errtrap
-if [ "${BASH_XTRACEFD:-}" ]; then
-    export BASH_XTRACEFD=$BASH_XTRACEFD
-else
-    [ ! -e /proc/$$/fd/4 ] || crash "fd 4 needs to be closed"
-    exec 4>${XTRACE:-/dev/null}
-    export BASH_XTRACEFD=4
+if [ ! "${BASH_XTRACEFD:-}" ]; then
+    XTRACE=${XTRACE:-/dev/null}
+    exec {BASH_XTRACEFD}>"$XTRACE"
 fi
+export BASH_XTRACEFD=$BASH_XTRACEFD
+set -x
