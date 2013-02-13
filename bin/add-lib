@@ -99,7 +99,7 @@ fi
 # create csv & fa files
 tawk -v lib_name=$1 -v max_frag_size=$max_frag_size -v lib_fa="$lib_fa" \
     -v ref_fa="$ref_fa" -v ref_fai="$ref_fai" \
-    <"$3" >"$lib_csv" \
+    <"$3" >"$lib_csv" 2>/dev/null \
 '
 BEGIN {
   while ((getline < ref_fai) > 0) {
