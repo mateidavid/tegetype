@@ -228,7 +228,7 @@ STATS_FILE=
 stage_command () {
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
-	add_dummy_pairs=1 get_orig_mappings $i \
+	add_dummy_pairs=1 get_mappings_by_read_name $i \
 	    | add-extra-sam-flags -N 4 -l $pairing_file \
 	    | filter-concordant -N 4 -l $pairing_file 3>&1 >/dev/null \
 	    | sam-to-fq -s -l $pairing_file
