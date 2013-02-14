@@ -1,2 +1,13 @@
 #!/bin/bash
-exec tawk '/^@HD/ {for (i=1;i<=NF;i++) {if (substr($i,1,2)=="SO") break;} $i="SO:coordinate";} 1'
+exec 0< <(zc "$@")
+
+IFS=$'\n'
+read -r line || exit 0
+if [ "${line:0:3}" = "@HD" ]; then
+    echo "$line" | tawk '/^@HD/ {for (i=2;i<=NF;i++) {if (substr($i,1,2)=="SO") break;} $i="SO:coordinate";} 1'
+else
+    print_tab "@HD" "VN:1.0" "SO:coordinate"
+    echo "$line"
+fi
+
+exec zc
