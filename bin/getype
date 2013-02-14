@@ -195,7 +195,9 @@ stage_command () {
     while read -r -a line; do
 	make_note "processing: ${line[@]}"
 	for file in ${sorted_mappings[@]}; do
-	    samtools view $file ${line[1]}:$((${line[2]} + 1))-${line[3]}
+	    local_chr_name=$(tawk "\$1==\"${line[1]}\"" <$(basename $f) | cut -f 2)
+	    [ "$local_chr_name" ] || continue
+	    samtools view $file $local_chr_name:$((${line[2]} + 1))-${line[3]}
 	done \
 	    | add-dummy-pairs \
 	    | sam-rsort 2>/dev/null \
