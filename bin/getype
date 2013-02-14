@@ -195,7 +195,7 @@ stage_command () {
     while read -r -a line; do
 	make_note "processing: ${line[@]}"
 	for file in ${sorted_mappings[@]}; do
-	    local_chr_name=$(tawk "\$1==\"${line[1]}\"" <$(basename $f) | cut -f 2)
+	    local_chr_name=$(tawk "\$1==\"${line[1]}\"" <$(basename $f).chr_map | cut -f 2)
 	    [ "$local_chr_name" ] || continue
 	    samtools view $file $local_chr_name:$((${line[2]} + 1))-${line[3]}
 	done \
