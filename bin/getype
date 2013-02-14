@@ -206,7 +206,8 @@ stage_command () {
 	    | add-extra-sam-flags -N 4 -l $pairing_file \
 	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
 	    | get-te-evidence -l $pairing_file \
-	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} >>$ref_evidence
+	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
+	    -s $((${line[3]} - ${line[2]})) >>$ref_evidence
     done <$lib_csv
 }
 run_stage
