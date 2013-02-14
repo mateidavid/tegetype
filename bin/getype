@@ -47,43 +47,6 @@ need_sorted_mappings () {
     [ $START_STAGE -lt 3 ]
 }
 
-ORIG_MAPPINGS=${ORIG_MAPPINGS:-}
-if need_mappings; then
-    # need original mappings
-    ORIG_MAPPINGS=${ORIG_MAPPINGS:-*.sort.bam}
-    make_note "using mapping file(s): [$ORIG_MAPPINGS]"
-    ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
-    orig_mappings=($(ls $ORIG_MAPPINGS))
-
-    make_note "using reads group(s): [${ORIG_READ_GROUPS:-}]"
-    orig_read_groups=($(echo ${ORIG_READ_GROUPS:-}))
-
-    make_note "dropping pairs mapped to different chromosomes: $(([ ${DROP_PAIRS_DIFF_CHR:-} ] && echo "yes") || echo "no")"
-fi
-
-if need_sorted_mappings; then
-    sorted_mappings=()
-    for f in ${orig_mappings[@]}; do
-	if (set +o pipefail; zc $f | head -n 1 | grep -q "coordinate"); then
-	    make_note "$f: sorted"
-	    sorted_mappings+=($f)
-	else
-	    make_note "$f: must sort"
-	    {
-		if (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM"); then
-		    exec samtools reheader <(samtools view -H $f | sam-set-sorted-header) $f
-		else
-		    {
-			sam-header $f | sam-set-sorted-header
-			exec sam-body $f
-		    } | samtools view -Su -
-		fi
-	    } | samtools sort -m 10000000000 - $(basename $f).sort
-	    sorted_mappings+=($(basename $f).sort.bam)
-	fi
-    done
-fi
-
 get_mappings_by_read_name() {
     file=${orig_mappings[$1]}
     [ -r $file ] || crash "$file: file not found"
@@ -107,6 +70,62 @@ get_mappings_by_read_name() {
 #    (set +e +o pipefail; eval $command | add-default-rg $rg || true)
     eval $command | add-default-rg $rg
 }
+
+
+ORIG_MAPPINGS=${ORIG_MAPPINGS:-}
+if need_mappings; then
+    # need original mappings
+    ORIG_MAPPINGS=${ORIG_MAPPINGS:-*.sort.bam}
+    make_note "using mapping file(s): [$ORIG_MAPPINGS]"
+    ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
+    orig_mappings=($(ls $ORIG_MAPPINGS))
+
+    make_note "using reads group(s): [${ORIG_READ_GROUPS:-}]"
+    orig_read_groups=($(echo ${ORIG_READ_GROUPS:-}))
+
+    make_note "dropping pairs mapped to different chromosomes: $(([ ${DROP_PAIRS_DIFF_CHR:-} ] && echo "yes") || echo "no")"
+
+    # check largest chromosome size
+    largest_chr_idx=$(set +o pipefail; sort -k 2,2nr $ref_fai | head -n 1 | cut -f 2)
+    i=0
+    while [ $i -lt ${#orig_mappings[@]} ]; do
+	largest_chr_file=$(set +o pipefail; get_mappings_by_read_name $i | sam-get-fai | sort -k 2,2nr | head -n 1 | cut -f 2)
+	[ "$largest_chr_idx" = "$largest_chr_file" ] || \
+	    crash "largest chr in file [${orig_mappings[$i]}] different than the one in index"
+	let i+=1
+    done
+fi
+
+if need_sorted_mappings; then
+    sorted_mappings=()
+    for f in ${orig_mappings[@]}; do
+	if (set +o pipefail; zc $f | head -n 1 | grep -q "coordinate"); then
+	    make_note "$f: sorted"
+	    sorted_mappings+=($f)
+	else
+	    make_note "$f: must sort"
+	    {
+		if (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM"); then
+		    exec samtools reheader <(samtools view -H $f | sam-set-sorted-header) $f
+		else
+		    {
+			sam-header $f | sam-set-sorted-header
+			exec sam-body $f
+		    } | samtools view -Su -
+		fi
+	    } | samtools sort -m 10000000000 - $(basename $f).sort
+	    sorted_mappings+=($(basename $f).sort.bam)
+	fi
+    done
+
+    for f in ${sorted_mappings[@]}; do
+	join -j 2 -t "	" \
+	    <(sort -k 2,2 $ref_fai | cut -f 1,2) \
+	    <(samtools view -H $f | sam-get-fai | sort -k 2,2) \
+	    | sort -k 1,1nr \
+	    | cut -f 2,3 >$f.chr_map
+    done
+fi
 
 
 #
