@@ -114,7 +114,9 @@ if need_sorted_mappings; then
 	largest_chr_file=$(set +o pipefail; samtools view -H $f | sam-get-fai | sort -k 2,2nr | head -n 1 | cut -f 2)
 	[ "$largest_chr_idx" = "$largest_chr_file" ] || \
 	    crash "largest chr in file [$f] different than the one in index"
-	join -j 2 -t "	" \
+	# if map doesn't exist, create it
+	[ -r $(basename $f).chr_map ] || \
+	    join -j 2 -t "	" \
 	    <(sort -k 2,2 $ref_fai | cut -f 1,2) \
 	    <(samtools view -H $f | sam-get-fai | sort -k 2,2) \
 	    | sort -k 1,1nr \
