@@ -84,16 +84,6 @@ if need_mappings; then
     orig_read_groups=($(echo ${ORIG_READ_GROUPS:-}))
 
     make_note "dropping pairs mapped to different chromosomes: $(([ ${DROP_PAIRS_DIFF_CHR:-} ] && echo "yes") || echo "no")"
-
-    # check largest chromosome size
-    largest_chr_idx=$(set +o pipefail; sort -k 2,2nr $ref_fai | head -n 1 | cut -f 2)
-    i=0
-    while [ $i -lt ${#orig_mappings[@]} ]; do
-	largest_chr_file=$(set +o pipefail; get_mappings_by_read_name $i | sam-get-fai | sort -k 2,2nr | head -n 1 | cut -f 2)
-	[ "$largest_chr_idx" = "$largest_chr_file" ] || \
-	    crash "largest chr in file [${orig_mappings[$i]}] different than the one in index"
-	let i+=1
-    done
 fi
 
 if need_sorted_mappings; then
@@ -118,12 +108,17 @@ if need_sorted_mappings; then
 	fi
     done
 
+    # check largest chromosome size; build chr maps
+    largest_chr_idx=$(set +o pipefail; sort -k 2,2nr $ref_fai | head -n 1 | cut -f 2)
     for f in ${sorted_mappings[@]}; do
+	largest_chr_file=$(set +o pipefail; samtools view -H $f | sam-get-fai | sort -k 2,2nr | head -n 1 | cut -f 2)
+	[ "$largest_chr_idx" = "$largest_chr_file" ] || \
+	    crash "largest chr in file [$f] different than the one in index"
 	join -j 2 -t "	" \
 	    <(sort -k 2,2 $ref_fai | cut -f 1,2) \
 	    <(samtools view -H $f | sam-get-fai | sort -k 2,2) \
 	    | sort -k 1,1nr \
-	    | cut -f 2,3 >$f.chr_map
+	    | cut -f 2,3 >$(basename $f).chr_map
     done
 fi
 
