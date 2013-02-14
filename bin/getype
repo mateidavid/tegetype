@@ -207,7 +207,7 @@ stage_command () {
 	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
 	    | get-te-evidence -l $pairing_file \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
-	    -s $((${line[2]} + 1)),${line[2]} >>$ref_evidence
+	    -s $((${line[2]} + 1)),${line[3]} >>$ref_evidence
     done <$lib_csv
 }
 run_stage
