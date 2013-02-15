@@ -257,7 +257,7 @@ run_stage
 STAGE_NUM=5
 STAGE_NAME="mapping to alternate alleles"
 mappings_to_alt=$ngs_name.$lib_name.map.to_alt_lib
-INPUT_FILES="$reads_to_remap.*.[12].fq.gz"
+INPUT_FILES="$reads_to_remap.*.[12].tfq.gz"
 OUTPUT_FILES="$mappings_to_alt.*.bam"
 STATS_FILE=
 stage_command() {
