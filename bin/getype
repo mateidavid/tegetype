@@ -20,7 +20,6 @@ source "$lib_settings_sh"
 set_ref_var_names $ref_name
 check_files_readable "$ref_fa" "$ref_fai"
 
-prefix=$ngs_name.$lib_name
 
 #
 # don't trust the user; check most settings
@@ -130,7 +129,7 @@ fi
 #
 STAGE_NUM=1
 STAGE_NAME="detect pairing information"
-pairing_file=$prefix.pairing
+pairing_file=$ngs_name.$ref_name.pairing
 INPUT_FILES="$ORIG_MAPPINGS"
 OUTPUT_FILES="$pairing_file"
 STATS_FILE=
@@ -188,7 +187,7 @@ done
 #
 STAGE_NUM=3
 STAGE_NAME="gather evidence for reference allele"
-ref_evidence=$prefix.ref-evidence.csv
+ref_evidence=$ngs_name.$lib_name.ref-evidence.csv
 INPUT_FILES=${sorted_mappings[@]}
 OUTPUT_FILES=$ref_evidence
 STATS_FILE=
@@ -221,7 +220,7 @@ run_stage
 #
 STAGE_NUM=4
 STAGE_NAME="extract discordant reads"
-reads_to_remap=$prefix.reads.to_remap
+reads_to_remap=$ngs_name.$ref_name.reads.to_remap
 INPUT_FILES="$ORIG_MAPPINGS"
 OUTPUT_FILES="$reads_to_remap.*.[12].fq.gz"
 STATS_FILE=
@@ -253,7 +252,7 @@ run_stage
 #
 STAGE_NUM=5
 STAGE_NAME="mapping to alternate alleles"
-mappings_to_alt=$prefix.map.to-alt
+mappings_to_alt=$ngs_name.$lib_name.map.to-alt
 INPUT_FILES="$reads_to_remap.*.[12].fq.gz"
 OUTPUT_FILES="$mappings_to_alt.*.bam"
 STATS_FILE=
@@ -278,7 +277,7 @@ run_stage
 #
 STAGE_NUM=6
 STAGE_NAME="sort alternate mappings"
-MAPPINGS_SORT_TO_ALT=$prefix.map.sort-to-alt
+MAPPINGS_SORT_TO_ALT=$ngs_name.$lib_name.map.sort-to-alt
 INPUT_FILES="$mappings_to_alt.*.bam"
 OUTPUT_FILES="$MAPPINGS_SORT_TO_ALT.bam"
 STATS_FILE=
@@ -294,7 +293,7 @@ run_stage
 #
 STAGE_NUM=3
 STAGE_NAME="gather evidence for alternate allele"
-ALT_EVIDENCE=$prefix.alt-evidence.csv
+ALT_EVIDENCE=$ngs_name.$lib_name.alt-evidence.csv
 INPUT_FILES=$MAPPINGS_SORT_TO_ALT.bam
 OUTPUT_FILES=$ALT_EVIDENCE
 STATS_FILE=
