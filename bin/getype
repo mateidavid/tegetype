@@ -297,7 +297,7 @@ run_stage
 #
 # Stage 7: Genotype alternate allele
 #
-STAGE_NUM=3
+STAGE_NUM=7
 STAGE_NAME="gather evidence for alternate allele"
 alt_evidence=$ngs_name.$lib_name.alt-evidence.csv
 INPUT_FILES=$mappings_to_alt_sort.bam
