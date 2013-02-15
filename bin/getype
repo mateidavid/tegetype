@@ -175,13 +175,16 @@ stage_command () {
 run_stage
 
 sorted_mappings=()
-for file in ${orig_mappings[@]}; do
-    if (set +o pipefail; zc $file | head -n 1 | grep -q "coordinate"); then
-	sorted_mappings+=($file)
-    else
-	sorted_mappings+=($(basename $file).sort.bam)
-    fi
-done
+if need_sorted_mappings; then
+    for file in ${orig_mappings[@]}; do
+	if (set +o pipefail; zc $file | head -n 1 | grep -q "coordinate"); then
+	    sorted_mappings+=($file)
+	else
+	    sorted_mappings+=($(basename $file).sort.bam)
+	fi
+    done
+else
+
 
 #
 # Stage 3: Genotype reference allele
@@ -189,7 +192,7 @@ done
 STAGE_NUM=3
 STAGE_NAME="gather evidence for reference allele"
 ref_evidence=$ngs_name.$lib_name.ref-evidence.csv
-INPUT_FILES=${sorted_mappings[@]}
+INPUT_FILES=${sorted_mappings[@]:-}
 OUTPUT_FILES=$ref_evidence
 STATS_FILE=
 stage_command () {
