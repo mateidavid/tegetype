@@ -39,11 +39,11 @@ make_note "using START_STAGE=$START_STAGE and END_STAGE=$END_STAGE"
 
 
 need_mappings () {
-    [ $START_STAGE -lt 3 ]
+    [ $START_STAGE -le 4 ]
 }
 
 need_sorted_mappings () {
-    [ $START_STAGE -lt 3 ]
+    [ $START_STAGE -le 3 ]
 }
 
 get_mappings_by_read_name() {
