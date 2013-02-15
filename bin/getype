@@ -183,7 +183,7 @@ if need_sorted_mappings; then
 	    sorted_mappings+=($(basename $file).sort.bam)
 	fi
     done
-else
+fi
 
 
 #
