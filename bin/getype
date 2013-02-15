@@ -103,6 +103,7 @@ if need_sorted_mappings; then
 		    } | samtools view -Su -
 		fi
 	    } | samtools sort -m 10000000000 - $(basename $f).sort
+	    samtools index $(basename $f).sort.bam
 	    sorted_mappings+=($(basename $f).sort.bam)
 	fi
     done
