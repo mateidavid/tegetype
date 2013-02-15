@@ -263,7 +263,7 @@ STATS_FILE=
 stage_command() {
     while read -r -a line; do
 	[ -f $reads_to_remap.${line[0]}.1.tfq.gz ] || continue
-	bowtie2-sort -x $lib_bt2_idx -p $NCPU --phred33 \
+	bowtie2 -x $lib_bt2_idx -p $NCPU --phred33 \
 	    -1 <(fq-convert -v ofq=fq <$reads_to_remap.${line[0]}.1.tfq.gz) \
 	    -2 <(fq-convert -v ofq=fq <$reads_to_remap.${line[0]}.2.tfq.gz) \
 	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} \
