@@ -253,16 +253,16 @@ run_stage
 #
 STAGE_NUM=5
 STAGE_NAME="mapping to alternate alleles"
-mappings_to_alt=$ngs_name.$lib_name.map.to-alt
+mappings_to_alt=$ngs_name.$lib_name.map.to_alt_lib
 INPUT_FILES="$reads_to_remap.*.[12].fq.gz"
 OUTPUT_FILES="$mappings_to_alt.*.bam"
 STATS_FILE=
 stage_command() {
     while read -r -a line; do
 	[ -f $reads_to_remap.${line[0]}.1.tfq.gz ] || continue
-	bowtie2-sort -x $ALT_BT2 -p $NCPU --phred33 \
-	    -1 <(fq-convert -v ofq=fq $reads_to_remap.${line[0]}.1.tfq.gz) \
-	    -2 <(fq-convert -v ofq=fq $reads_to_remap.${line[0]}.2.tfq.gz) \
+	bowtie2-sort -x $lib_bt2_idx -p $NCPU --phred33 \
+	    -1 <(fq-convert -v ofq=fq <$reads_to_remap.${line[0]}.1.tfq.gz) \
+	    -2 <(fq-convert -v ofq=fq <$reads_to_remap.${line[0]}.2.tfq.gz) \
 	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} \
 	    | samtools view -Sb - >$mappings_to_alt.${line[0]}.bam
     done <$pairing_file
@@ -278,13 +278,14 @@ run_stage
 #
 STAGE_NUM=6
 STAGE_NAME="sort alternate mappings"
-MAPPINGS_SORT_TO_ALT=$ngs_name.$lib_name.map.sort-to-alt
+mappings_to_alt_sort=$ngs_name.$lib_name.map.to_alt_lib_sort
 INPUT_FILES="$mappings_to_alt.*.bam"
-OUTPUT_FILES="$MAPPINGS_SORT_TO_ALT.bam"
+OUTPUT_FILES="$mappings_to_alt_sort.bam"
 STATS_FILE=
 stage_command() {
     samtools merge -u -h <(bam-merge-rg-headers $mappings_to_alt.*.bam) - \
-	$mappings_to_alt.*.bam | samtools sort -m 10000000000 - $MAPPINGS_SORT_TO_ALT
+	$mappings_to_alt.*.bam | samtools sort -m 10000000000 - $mappings_to_alt_sort
+    samtools index $mappings_to_alt_sort.bam
 }
 run_stage
 
@@ -294,20 +295,21 @@ run_stage
 #
 STAGE_NUM=3
 STAGE_NAME="gather evidence for alternate allele"
-ALT_EVIDENCE=$ngs_name.$lib_name.alt-evidence.csv
-INPUT_FILES=$MAPPINGS_SORT_TO_ALT.bam
-OUTPUT_FILES=$ALT_EVIDENCE
+alt_evidence=$ngs_name.$lib_name.alt-evidence.csv
+INPUT_FILES=$mappings_to_alt_sort.bam
+OUTPUT_FILES=$alt_evidence
 STATS_FILE=
 stage_command () {
-    rm -f $ALT_EVIDENCE
+    rm -f $alt_evidence
     while read -r -a line; do
 	make_note "processing: ${line[@]}"
-	samtools view $MAPPINGS_SORT_TO_ALT.bam ${line[8]}:${line[9]}-${line[10]} \
+	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
 	    | sam-rsort 2>/dev/null \
 	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
 	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \
 	    | get-te-evidence -P -l $pairing_file \
-	    -t ${line[11]},${line[12]} -t ${line[13]},${line[14]} >>$ALT_EVIDENCE
-    done <$TARGETS_CSV
+	    -t ${line[11]},${line[12]} -t ${line[13]},${line[14]} \
+	    -s $((${line[9]} + 1))-${line[10]} >>$alt_evidence
+    done <$lib_csv
 }
 run_stage
