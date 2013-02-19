@@ -308,7 +308,7 @@ stage_command () {
     while read -r -a line; do
 	make_note "processing: ${line[@]}"
 	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
-	    | sam-rsort -P 2>/dev/null \
+	    | sam-rsort --cid-parser cid_parser 2>/dev/null \
 	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
 	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \
 	    | get-te-evidence -P -l $pairing_file \
