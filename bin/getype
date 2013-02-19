@@ -226,7 +226,7 @@ STAGE_NUM=4
 STAGE_NAME="extract discordant reads"
 reads_to_remap=$ngs_name.$ref_name.reads.to_remap
 INPUT_FILES="$ORIG_MAPPINGS"
-OUTPUT_FILES="$reads_to_remap.*.[12].fq.gz"
+OUTPUT_FILES="$reads_to_remap.*.[12].tfq.gz"
 STATS_FILE=
 stage_command () {
     i=0
