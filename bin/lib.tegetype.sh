@@ -426,9 +426,14 @@ set_ref_var_names () {
 
 set_lib_var_names () {
     lib_settings_sh=$BASE_DIR/data/lib.$1.settings.sh
+    [ ! -r $lib_settings_sh ] || source $lib_settings_sh
     lib_csv=$BASE_DIR/data/lib.$1.csv
     lib_fa=$BASE_DIR/data/lib.$1.fa
-    lib_bt2_idx=$BASE_DIR/data/lib.$1
+    if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
+	lib_bt2_idx=$BASE_DIR/data/lib.$ref_name+$1
+    else
+	lib_bt2_idx=$BASE_DIR/data/lib.$1
+    fi
 }
 
 check_files_readable () {

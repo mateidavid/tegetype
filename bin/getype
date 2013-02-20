@@ -16,7 +16,6 @@ lib_name=$2
 set_lib_var_names "$2"
 check_files_readable "$lib_settings_sh" "$lib_csv" "$lib_fa" \
     "$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}
-source "$lib_settings_sh"
 set_ref_var_names $ref_name
 check_files_readable "$ref_fa" "$ref_fai"
 
@@ -187,42 +186,12 @@ fi
 
 
 #
-# Stage 3: Genotype reference allele
-#
-STAGE_NUM=3
-STAGE_NAME="gather evidence for reference allele"
-ref_evidence=$ngs_name.$lib_name.ref-evidence.csv
-INPUT_FILES=${sorted_mappings[@]:-}
-OUTPUT_FILES=$ref_evidence
-STATS_FILE=
-stage_command () {
-    rm -f $ref_evidence
-    while read -r -a line; do
-	make_note "processing: ${line[@]}"
-	for f in ${sorted_mappings[@]}; do
-	    local_chr_name=$(tawk "\$1==\"${line[1]}\"" <$(basename $f).chr_map | cut -f 2)
-	    [ "$local_chr_name" ] || continue
-	    samtools view $f $local_chr_name:$((${line[2]} + 1))-${line[3]}
-	done \
-	    | add-dummy-pairs \
-	    | sam-rsort 2>/dev/null \
-	    | add-extra-sam-flags -N 4 -l $pairing_file \
-	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
-	    | get-te-evidence -l $pairing_file \
-	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
-	    -s $((${line[2]} + 1)),${line[3]} >>$ref_evidence
-    done <$lib_csv
-}
-run_stage
-
-
-#
-# Stage 4: Extract discordant reads and rename them
+# Stage 3: Extract discordant reads and rename them
 #
 # Input: mappings, reads
 # Output: reads unmapped and reads mapped unpaired
 #
-STAGE_NUM=4
+STAGE_NUM=3
 STAGE_NAME="extract discordant reads"
 reads_to_remap=$ngs_name.$ref_name.reads.to_remap
 INPUT_FILES="$ORIG_MAPPINGS"
@@ -249,14 +218,18 @@ run_stage
 
 
 #
-# Stage 5: Mapping to collection of alternate alleles
+# Stage 4: Mapping to collection of alternate alleles
 #
 # Input: reads to remap
 # Output: mappings to alternate alleles
 #
-STAGE_NUM=5
+STAGE_NUM=4
 STAGE_NAME="mapping to alternate alleles"
-mappings_to_alt=$ngs_name.$lib_name.map.to_alt_lib
+if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
+    mappings_to_alt=$ngs_name.$lib_name.map.to_ref+alt_lib
+else
+    mappings_to_alt=$ngs_name.$lib_name.map.to_alt_lib
+fi
 INPUT_FILES="$reads_to_remap.*.[12].tfq.gz"
 OUTPUT_FILES="$mappings_to_alt.*.bam"
 STATS_FILE=
@@ -275,14 +248,18 @@ run_stage
 
 
 #
-# Stage 6: Sort alternate mappings
+# Stage 5: Sort alternate mappings
 #
 # Input: mappings to alternate alleles
 # Output: single file, sorted
 #
-STAGE_NUM=6
+STAGE_NUM=5
 STAGE_NAME="sort alternate mappings"
-mappings_to_alt_sort=$ngs_name.$lib_name.map.to_alt_lib_sort
+if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
+    mappings_to_alt_sort=$ngs_name.$lib_name.map.to_ref+alt_lib_sort
+else
+    mappings_to_alt_sort=$ngs_name.$lib_name.map.to_alt_lib_sort
+fi
 INPUT_FILES="$mappings_to_alt.*.bam"
 OUTPUT_FILES="$mappings_to_alt_sort.bam"
 STATS_FILE=
@@ -290,6 +267,49 @@ stage_command() {
     samtools merge -u -h <(bam-merge-rg-headers $mappings_to_alt.*.bam) - \
 	$mappings_to_alt.*.bam | samtools sort -m 10000000000 - $mappings_to_alt_sort
     samtools index $mappings_to_alt_sort.bam
+}
+run_stage
+
+
+#
+# Stage 6: Genotype reference allele
+#
+STAGE_NUM=6
+STAGE_NAME="gather evidence for reference allele"
+if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
+    ref_evidence=$ngs_name.$lib_name.ref+remap-evidence.csv
+    INPUT_FILES="${sorted_mappings[@]:-} $mappings_to_alt_sort"
+else
+    ref_evidence=$ngs_name.$lib_name.ref-evidence.csv
+    INPUT_FILES=${sorted_mappings[@]:-}
+fi
+OUTPUT_FILES=$ref_evidence
+STATS_FILE=
+stage_command () {
+    rm -f $ref_evidence
+    while read -r -a line; do
+	make_note "processing: ${line[@]}"
+	{
+	    for f in ${sorted_mappings[@]}; do
+		local_chr_name=$(tawk "\$1==\"${line[1]}\""
+		    <$(basename $f).chr_map | cut -f 2)
+		[ "$local_chr_name" ] || continue
+		samtools view $f \
+		    $local_chr_name:$((${line[2]} + 1))-${line[3]}
+	    done
+	    if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
+		samtools view $mappings_to_alt_sort.bam \
+		    ${line[1]}:$((${line[2]} + 1))-${line[3]}
+	    fi
+	} \
+	    | add-dummy-pairs \
+	    | sam-rsort 2>/dev/null \
+	    | add-extra-sam-flags -N 4 -l $pairing_file \
+	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
+	    | get-te-evidence -l $pairing_file \
+	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
+	    -s $((${line[2]} + 1)),${line[3]} >>$ref_evidence
+    done <$lib_csv
 }
 run_stage
 

@@ -28,7 +28,6 @@ for f in "$data_dir"/lib.*.csv; do
 	fi
     done
     if [ $have_all ]; then
-	source "$lib_settings_sh"
 	print_tab $lib_name $ref_name $max_frag_size
     fi
 done
