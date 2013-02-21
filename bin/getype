@@ -306,7 +306,7 @@ stage_command () {
 		    ${line[1]}:$((${line[2]} + 1))-${line[3]}
 	    fi
 	} \
-	    | sam-filter-nm \
+	    | sam-filter-nm 3>/dev/null \
 	    | add-dummy-pairs \
 	    | sam-rsort 2>/dev/null \
 	    | add-extra-sam-flags -N 4 -l $pairing_file \
@@ -337,7 +337,7 @@ stage_command () {
     while read -r -a line; do
 	make_note "processing: ${line[@]:0:15}"
 	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
-	    | sam-filter-nm \
+	    | sam-filter-nm 3>/dev/null \
 	    | sam-rsort --cid-parser cid_parser 2>/dev/null \
 	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
 	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \

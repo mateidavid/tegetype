@@ -12,7 +12,7 @@ tee-p >(exec sam-header >&$stdout_direct) \
   i=12;
   while (i<=NF && substr($i,1,2)!="NM") i+=1;
   if (i<=NF && int(substr($i,6))>max_nm) {
-    print >"/dev/stderr";
+    print >"/dev/fd/3";
     next;
   }
   print;
