@@ -291,7 +291,8 @@ stage_command () {
 	make_note "processing: ${line[@]}"
 	{
 	    for f in ${sorted_mappings[@]}; do
-		local_chr_name=$(tawk "\$1==\"${line[1]}\"" <$(basename $f).chr_map | cut -f 2)
+		local_chr_name=$(tawk "\$1==\"${line[1]}\"" \
+		    <$(basename $f).chr_map | cut -f 2)
 		[ "$local_chr_name" ] || continue
 		samtools view $f \
 		    $local_chr_name:$((${line[2]} + 1))-${line[3]}
@@ -301,6 +302,7 @@ stage_command () {
 		    ${line[1]}:$((${line[2]} + 1))-${line[3]}
 	    fi
 	} \
+	    | sam-filter-nm \
 	    | add-dummy-pairs \
 	    | sam-rsort 2>/dev/null \
 	    | add-extra-sam-flags -N 4 -l $pairing_file \
@@ -331,6 +333,7 @@ stage_command () {
     while read -r -a line; do
 	make_note "processing: ${line[@]}"
 	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
+	    | sam-filter-nm \
 	    | sam-rsort --cid-parser cid_parser 2>/dev/null \
 	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
 	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \
