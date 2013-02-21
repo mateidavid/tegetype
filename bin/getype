@@ -292,7 +292,7 @@ STATS_FILE=
 stage_command () {
     rm -f $ref_evidence
     while read -r -a line; do
-	make_note "processing: ${line[@]}"
+	make_note "processing: ${line[@]:0:15}"
 	{
 	    for f in ${sorted_mappings[@]}; do
 		local_chr_name=$(tawk "\$1==\"${line[1]}\"" \
@@ -335,7 +335,7 @@ STATS_FILE=
 stage_command () {
     rm -f $alt_evidence
     while read -r -a line; do
-	make_note "processing: ${line[@]}"
+	make_note "processing: ${line[@]:0:15}"
 	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
 	    | sam-filter-nm \
 	    | sam-rsort --cid-parser cid_parser 2>/dev/null \
