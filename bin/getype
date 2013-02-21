@@ -277,7 +277,7 @@ run_stage
 STAGE_NUM=6
 STAGE_NAME="gather evidence for reference allele"
 if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-    ref_evidence=$ngs_name.$lib_name.ref+remap-evidence.csv
+    ref_evidence=$ngs_name.$lib_name.ref+alt.ref-evidence.csv
     INPUT_FILES="${sorted_mappings[@]:-} $mappings_to_alt_sort.bam"
 else
     ref_evidence=$ngs_name.$lib_name.ref-evidence.csv
@@ -319,7 +319,11 @@ run_stage
 #
 STAGE_NUM=7
 STAGE_NAME="gather evidence for alternate allele"
-alt_evidence=$ngs_name.$lib_name.alt-evidence.csv
+if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
+    alt_evidence=$ngs_name.$lib_name.ref+alt.alt-evidence.csv
+else
+    alt_evidence=$ngs_name.$lib_name.alt-evidence.csv
+fi
 INPUT_FILES=$mappings_to_alt_sort.bam
 OUTPUT_FILES=$alt_evidence
 STATS_FILE=
