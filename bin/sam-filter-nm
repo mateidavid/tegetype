@@ -1,0 +1,21 @@
+#!/bin/bash
+set -eEu -o pipefail
+
+exec < <(exec zc "$@")
+exec {stdout_direct}>&1
+tee-p >(exec sam-header >&$stdout_direct) \
+    | { \
+	sam-body \
+	    | tawk -v max_nm=${MAX_NM:-20} \
+'
+{
+  i=12;
+  while (i<=NF && substr($i,1,2)!="NM") i+=1;
+  if (i<=NF && int(substr($i,6))>max_nm) {
+    print >"/dev/stderr";
+    next;
+  }
+  print;
+}
+'
+      } {stdout_direct}>&-
