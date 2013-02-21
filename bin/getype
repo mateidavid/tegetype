@@ -281,18 +281,18 @@ run_stage
 STAGE_NUM=6
 STAGE_NAME="gather evidence for reference allele"
 if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-    ref_evidence=$ngs_name.$lib_name.ref+alt.ref-evidence.csv
+    ref_evidence=$ngs_name.$lib_name.ref+alt.ref-evidence
     INPUT_FILES="${sorted_mappings[@]:-} $mappings_to_alt_sort.bam"
 else
-    ref_evidence=$ngs_name.$lib_name.ref-evidence.csv
+    ref_evidence=$ngs_name.$lib_name.ref-evidence
     INPUT_FILES=${sorted_mappings[@]:-}
 fi
-OUTPUT_FILES=$ref_evidence
+OUTPUT_FILES=$ref_evidence.csv
 STATS_FILE=
 stage_command () {
-    rm -f $ref_evidence
+    rm -f $ref_evidence.csv $ref_evidence.log
     while read -r -a line; do
-	make_note "processing: ${line[@]:0:15}"
+	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a $ref_evidence.log >&2
 	{
 	    for f in ${sorted_mappings[@]}; do
 		local_chr_name=$(tawk "\$1==\"${line[1]}\"" \
@@ -306,14 +306,14 @@ stage_command () {
 		    ${line[1]}:$((${line[2]} + 1))-${line[3]}
 	    fi
 	} \
-	    | sam-filter-nm 3>/dev/null \
+	    | sam-filter-nm 3>>$ref_evidence.log \
 	    | add-dummy-pairs \
 	    | sam-rsort 2> >(grep -v "some paired reads" >&2) \
 	    | add-extra-sam-flags -N 4 -l $pairing_file \
 	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
-	    | get-te-evidence -l $pairing_file -q $MIN_MQV \
+	    | get-te-evidence -l $pairing_file -q $MIN_MQV -v \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
-	    -s $((${line[2]} + 1)),${line[3]} >>$ref_evidence
+	    -s $((${line[2]} + 1)),${line[3]} >>$ref_evidence.csv 2>>$ref_evidence.log
     done <$lib_csv
 }
 run_stage
@@ -325,25 +325,25 @@ run_stage
 STAGE_NUM=7
 STAGE_NAME="gather evidence for alternate allele"
 if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-    alt_evidence=$ngs_name.$lib_name.ref+alt.alt-evidence.csv
+    alt_evidence=$ngs_name.$lib_name.ref+alt.alt-evidence
 else
-    alt_evidence=$ngs_name.$lib_name.alt-evidence.csv
+    alt_evidence=$ngs_name.$lib_name.alt-evidence
 fi
 INPUT_FILES=$mappings_to_alt_sort.bam
-OUTPUT_FILES=$alt_evidence
+OUTPUT_FILES=$alt_evidence.csv
 STATS_FILE=
 stage_command () {
-    rm -f $alt_evidence
+    rm -f $alt_evidence.csv $alt_evidence.log
     while read -r -a line; do
-	make_note "processing: ${line[@]:0:15}"
+	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a $alt_evidence.log >&2
 	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
-	    | sam-filter-nm 3>/dev/null \
+	    | sam-filter-nm 3>>$alt_evidence.log \
 	    | sam-rsort --cid-parser cid_parser 2> >(grep -v "some paired reads" >&2) \
 	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
 	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \
-	    | get-te-evidence -P -l $pairing_file -q $MIN_MQV \
+	    | get-te-evidence -P -l $pairing_file -q $MIN_MQV -v \
 	    -t ${line[11]},${line[12]} -t ${line[13]},${line[14]} \
-	    -s $((${line[9]} + 1)),${line[10]} >>$alt_evidence
+	    -s $((${line[9]} + 1)),${line[10]} >>$alt_evidence.csv 2>>$alt_evidence.log
     done <$lib_csv
 }
 run_stage
