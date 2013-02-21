@@ -308,7 +308,7 @@ stage_command () {
 	} \
 	    | sam-filter-nm 3>/dev/null \
 	    | add-dummy-pairs \
-	    | sam-rsort 2>/dev/null \
+	    | sam-rsort 2> >(grep -v "some paired reads" >&2) \
 	    | add-extra-sam-flags -N 4 -l $pairing_file \
 	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
 	    | get-te-evidence -l $pairing_file -q $MIN_MQV \
@@ -338,7 +338,7 @@ stage_command () {
 	make_note "processing: ${line[@]:0:15}"
 	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
 	    | sam-filter-nm 3>/dev/null \
-	    | sam-rsort --cid-parser cid_parser 2>/dev/null \
+	    | sam-rsort --cid-parser cid_parser 2> >(grep -v "some paired reads" >&2) \
 	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
 	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \
 	    | get-te-evidence -P -l $pairing_file -q $MIN_MQV \
