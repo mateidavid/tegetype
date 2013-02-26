@@ -199,7 +199,7 @@ STAGE_NUM=3
 STAGE_NAME="extract discordant reads"
 reads_to_remap=$ngs_name.$ref_name.reads.to_remap
 INPUT_FILES="$ORIG_MAPPINGS"
-OUTPUT_FILES="$reads_to_remap.*.[12].tfq.gz"
+OUTPUT_FILES="$reads_to_remap.*.[12].fq.gz"
 STATS_FILE=
 stage_command () {
     i=0
@@ -212,10 +212,10 @@ stage_command () {
     done \
 	| fq-trim-illumina-reads -v input_phred=33 \
         | fq-remove-short-paired-reads \
-        | fq-rename-paired-reads-with-len \
-	| fq-convert -v ofq=tfq \
+        | fq-rename-paired-reads-with-len -v ofq=tfq \
 	| sed 's/^\(.........\([0-9]\+\):\([12]\):\)/\2.\3\t\1/' \
-	| split-file-by-field -r -z --prefix $reads_to_remap. --suffix .tfq.gz \
+	| split-file-by-field -r --prefix $reads_to_remap. --suffix .fq.gz \
+	    --cmd "fq-convert -v ofq=fq | $ZIP" \
 	    -d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <$pairing_file)
 }
 run_stage
@@ -234,16 +234,16 @@ if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
 else
     mappings_to_alt=$ngs_name.$lib_name.map.to_alt_lib
 fi
-INPUT_FILES="$reads_to_remap.*.[12].tfq.gz"
+INPUT_FILES="$reads_to_remap.*.[12].fq.gz"
 OUTPUT_FILES="$mappings_to_alt.*.bam"
 STATS_FILE=
 stage_command() {
     while read -r -a line; do
 	make_note "remapping read group [${line[0]}]"
-	$PV $reads_to_remap.${line[0]}.1.tfq.gz | 
+	$PV $reads_to_remap.${line[0]}.1.fq.gz | zc |
 	bowtie2 -x $lib_bt2_idx -p $NCPU --phred33 --quiet \
-	    -1 <(fq-convert -v ofq=fq) \
-	    -2 <(fq-convert -v ofq=fq <$reads_to_remap.${line[0]}.2.tfq.gz) \
+	    -1 - \
+	    -2 <(zc $reads_to_remap.${line[0]}.2.fq.gz) \
 	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} \
 	    | samtools view -Sb - >$mappings_to_alt.${line[0]}.bam
     done <$pairing_file
