@@ -46,9 +46,9 @@ make_note "using MIN_MQV=$MIN_MQV"
 
 
 get_mappings_by_read_name() {
-    file=${orig_mappings_rsort[$1]:-${orig_mappings[$1]}}
+    local file=${orig_mappings_rsort[$1]:-${orig_mappings[$1]}}
     [ -r $file ] || crash "$file: file not found"
-    rg=${orig_read_groups[$1]:-}
+    local rg=${orig_read_groups[$1]:-}
     command="$PV $file"
     if (set +o pipefail; zc $file | head -n 1 | cut -c -3 | grep -q "BAM"); then
 	command="$command | samtools view -h -"
@@ -75,13 +75,13 @@ get_mappings_by_read_name() {
 
 make_note "using mapping file(s): [$ORIG_MAPPINGS]"
 ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
+orig_mappings=($(ls $ORIG_MAPPINGS))
 for f in ${orig_mappings[@]}; do
     (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM") ||
     crash "$f: not a BAM file"
     (set +o pipefail; zc $f | head -n 1 | grep -q "coordinate") ||
     crash "$f: not sorted by coordinate"
 done
-orig_mappings=($(ls $ORIG_MAPPINGS))
 
 make_note "using reads group(s): [${ORIG_READ_GROUPS:-}]"
 orig_read_groups=($(echo ${ORIG_READ_GROUPS:-}))
