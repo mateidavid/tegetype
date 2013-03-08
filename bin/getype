@@ -72,9 +72,12 @@ get_mappings_by_read_name() {
     if (set +o pipefail; zc $file | head -n 1 | grep -q "coordinate") || [ "${RSORT:-}" ]; then
 	command="$command | sam-rsort"
     fi
+    if [ "$rg" ]; then
+	command="$command | add-refault-rg -r \"$rg\" -s \"$ngs_name\""
+    fi
     make_note "command to get mappings: $command"
+    eval $command
 #    (set +e +o pipefail; eval $command | add-default-rg $rg || true)
-    eval $command | add-default-rg $rg
 }
 
 
