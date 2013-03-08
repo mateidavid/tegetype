@@ -46,7 +46,7 @@ make_note "using MIN_MQV=$MIN_MQV"
 
 
 need_mappings () {
-    [ $START_STAGE -le 4 ]
+    [ $START_STAGE -le 3 ]
 }
 
 need_sorted_mappings () {
