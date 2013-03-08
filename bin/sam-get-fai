@@ -1,8 +1,8 @@
 #!/bin/bash -eEu
 set -o pipefail
 
-sam-header "$@" \
-    | tawk \
+sam-header "$@" |
+tawk \
 '
 /^@SQ/ {
   i=2;
@@ -11,5 +11,5 @@ sam-header "$@" \
   while (j<=NF && substr($j,1,2)!="LN") ++j;
   print substr($i, 4), substr($j, 4);
 }
-' \
-    | sed 's/[SL]N://g'
+' |
+sed 's/[SL]N://g'
