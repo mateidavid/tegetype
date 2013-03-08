@@ -5,25 +5,35 @@ set -eEu -o pipefail
 data_dir=$BASE_DIR/data
 
 usage () {
-    echo "Use: $(basename $0) <ref_name>" >&2
+    echo "Use: $(basename $0) [ -f ] <ref_name>"
 }
 
+cl_force=
+OPTIND=1
+while getopts "f" OPT "$@"; do
+    case $OPT in
+	f)
+	    cl_force=1
+	    ;;
+    esac
+done
+shift $(($OPTIND - 1))
+
 if [ $# -ne 1 ]; then
-    usage
+    usage >&2
     exit
 fi
 
-ref_fa=$data_dir/ref.$1.fa
-ref_fai=$data_dir/ref.$1.fa.fai
+ref_name=$1
+set_ref_var_names $ref_name
 
-if [ -h "$ref_fa" ]; then
-    make_note "removing [$ref_fa]"
-    rm "$ref_fa"
-else
-    crash "reference [$1] was not added with add-ref"
-fi
-
-if [ -r "$ref_fai" ]; then
-    make_note "removing [$ref_fai]"
-    rm "$ref_fai"
-fi
+for f in "$ref_fa" "$ref_fai"; do
+    if [ -e "$f" ]; then
+	if [ -L "$f" ] || [ $cl_force ]; then
+	    make_note "[$f]: removing"
+	    rm "$f"
+	else
+	    make_note "[$f]: not a symlink; to remove use -f"
+	fi
+    fi
+done

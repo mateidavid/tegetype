@@ -5,18 +5,23 @@ set -eEu -o pipefail
 data_dir=$BASE_DIR/data
 
 usage () {
-    echo "Use: $(basename $0)" >&2
+    echo "Use: $(basename $0)"
 }
 
 if [ $# -ne 0 ]; then
-    usage
+    usage >&2
     exit
 fi
 
 for f in "$data_dir"/ref.*.fa; do
-    if [ -r $f ] && [ -r $f.fai ]; then
-	name=$(basename $f)
-	name=${name#ref.}
-	echo ${name%.fa}
+    ref_name=${f%.fa}
+    ref_name=${ref_name##*.}
+    set_ref_var_names $ref_name
+    have_all=1
+    for g in "$ref_fa" "$ref_fai"; do
+	[ -r "$g" ] || { have_all= ; break; }
+    done
+    if [ $have_all ]; then
+	echo $ref_name
     fi
 done

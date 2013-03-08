@@ -5,33 +5,56 @@ set -eEu -o pipefail
 data_dir=$BASE_DIR/data
 
 usage () {
-    echo "Use: $(basename $0) <ref_name> <fasta_file>" >&2
+    echo "Use: $(basename $0) [ -f <ref.fa> ] <ref_name>"
 }
 
-if [ $# -ne 2 ]; then
-    usage
+cl_ref_fa=
+OPTIND=1
+while getopts "f:" OPT "$@"; do
+    case $OPT in
+	f)
+	    cl_ref_fa=$OPTARG
+	    ;;
+    esac
+done
+shift $(($OPTIND - 1))
+
+if [ $# -ne 1 ]; then
+    usage >&2
     exit
 fi
 
-[[ "$1" =~ ^[[:alnum:]_-]*$ ]] || \
-    crash "illegal character in reference name [$1]"
-[ -r "$2" ] || crash "fasta file not found [$2]"
+[[ "$1" =~ ^[[:alnum:]_-]*$ ]] || crash "illegal character in reference name [$1]"
+[ ! "$cl_ref_fa" ] || check_files_readable "$cl_ref_fa"
 
-ref_fa=$data_dir/ref.$1.fa
-ref_fai=$data_dir/ref.$1.fa.fai
+ref_name=$1
+set_ref_var_names $ref_name
 
-[ ! -e "$ref_fa" ] || crash "file exists [$ref_fa]"
-[ ! -e "$ref_fai" ] || crash "file exists [$ref_fai]"
-
-find_my_name_and_dir "$2"
-ln -s "$MY_DIR/$MY_NAME" "$ref_fa"
-
-if [ -r "$MY_DIR/$MY_NAME".fai ]; then
-    make_note "using existing faidx file [$MY_DIR/$MY_NAME.fai]"
-    ln -s "$MY_DIR/$MY_NAME".fai "$ref_fai"
+# add fasta
+if [ -r "$ref_fa" ]; then
+    echo "file exists [$ref_fa]; to regenerate it, remove it, then rerun setup"
 else
-    make_note "generating faidx file"
-    samtools faidx "$ref_fa"
+    [ "$cl_ref_fa" ] || crash "reference fasta file must be given"
+    find_my_name_and_dir "$cl_ref_fa"
+    ln -s "$MY_DIR/$MY_NAME" "$ref_fa"
+    make_note "using fasta file [$cl_ref_fa]"
+fi
+
+# add fasta index
+if [ -r "ref_fai" ]; then
+    echo "file exists [$ref_fai]; to regenerate it, remove it, then rerun setup"
+else
+    if [ "$cl_ref_fa" ]; then
+	find_my_name_and_dir "$cl_ref_fa"
+	if [ -r "$MY_DIR/$MY_NAME".fai ]; then
+	    make_note "using existing faidx file [$MY_DIR/$MY_NAME.fai]"
+	    ln -s "$MY_DIR/$MY_NAME".fai "$ref_fai"
+	fi
+    fi
+    if [ ! -r "$ref_fai" ]; then
+	make_note "generating faidx file"
+	samtools faidx "$ref_fa"
+    fi
 fi
 
 make_note "added reference [$1]"

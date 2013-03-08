@@ -5,11 +5,11 @@ set -eEu -o pipefail
 data_dir=$BASE_DIR/data
 
 usage () {
-    echo "Use: $(basename $0)" >&2
+    echo "Use: $(basename $0)"
 }
 
 if [ $# -ne 0 ]; then
-    usage
+    usage >&2
     exit
 fi
 
@@ -21,7 +21,7 @@ for f in "$data_dir"/lib.*.csv; do
 
     have_all=1
     for g in "$lib_settings_sh" "$lib_csv" "$lib_fa" \
-	"$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}; do
+	"$lib_bt2_idx".{{1..4},rev.{1,2}}.bt2; do
 	if [ ! -r "$g" ]; then
 	    have_all=
 	    break

@@ -1,13 +1,18 @@
 #!/bin/bash
+[ "$BASE_DIR" ] ||
+{
+    echo "run this script through tegetype wrapper" >&2
+    exit 1
+}
 source lib.tegetype.sh
 set -eEu -o pipefail
 
 usage () {
-    echo "Use: $(basename $0) <ngs_name> <lib_name>" >&2
+    echo "Use: $(basename $0) <ngs_name> <lib_name>"
 }
 
 if [ $# -ne 2 ]; then
-    usage
+    usage >&2
     exit
 fi
 
@@ -15,7 +20,7 @@ ngs_name=$1
 lib_name=$2
 set_lib_var_names "$2"
 check_files_readable "$lib_settings_sh" "$lib_csv" "$lib_fa" \
-    "$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}
+    "$lib_bt2_idx".{{1..4},rev.{1,2}}.bt2
 set_ref_var_names $ref_name
 check_files_readable "$ref_fa" "$ref_fai"
 
@@ -23,12 +28,11 @@ check_files_readable "$ref_fa" "$ref_fai"
 #
 # don't trust the user; check most settings
 #
-(which python >/dev/null 2>&1 && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) \
-    || crash "python2.6+ not found"
-which samtools >/dev/null 2>&1 || crash "samtools not found"
-which bedtools >/dev/null 2>&1 || crash "bedtools not found"
-which bowtie2 >/dev/null 2>&1 || crash "bowtie2 not found"
-[[ "$AWKPATH" =~ $BASE_DIR/bin ]] || crash "AWKPATH not set properly"
+(cmd_exists python && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) ||
+crash "python2.6+ not found"
+cmd_exists samtools || crash "samtools not found"
+cmd_exists bedtools || crash "bedtools not found"
+cmd_exists bowtie2 || crash "bowtie2 not found"
 
 
 make_note "using NCPU=$NCPU"
@@ -112,18 +116,18 @@ if need_sorted_mappings; then
     done
 
     # check largest chromosome size; build chr maps
-    largest_chr_idx=$(set +o pipefail; sort -k 2,2nr $ref_fai | head -n 1 | cut -f 2)
+    largest_chr_idx=$(set +o pipefail; sort -k 2,2nr "$ref_fai" | head -n 1 | cut -f 2)
     for f in ${sorted_mappings[@]}; do
 	largest_chr_file=$(set +o pipefail; samtools view -H $f | sam-get-fai | sort -k 2,2nr | head -n 1 | cut -f 2)
-	[ "$largest_chr_idx" = "$largest_chr_file" ] || \
-	    crash "largest chr in file [$f] different than the one in index"
+	[ "$largest_chr_idx" = "$largest_chr_file" ] ||
+	crash "largest chr in file [$f] different than the one in index"
 	# if map doesn't exist, create it
-	[ -r $(basename $f).chr_map ] || \
-	    join -j 2 -t "	" \
+	[ -r $(basename $f).chr_map ] ||
+	join -j 2 -t "	" \
 	    <(sort -k 2,2 $ref_fai | cut -f 1,2) \
-	    <(samtools view -H $f | sam-get-fai | sort -k 2,2) \
-	    | sort -k 1,1nr \
-	    | cut -f 2,3 >$(basename $f).chr_map
+	    <(samtools view -H $f | sam-get-fai | sort -k 2,2) |
+	sort -k 1,1nr |
+	cut -f 2,3 >$(basename $f).chr_map
     done
 fi
 
@@ -136,18 +140,17 @@ STAGE_NAME="detect pairing information"
 pairing_file=$ngs_name.$ref_name.pairing
 INPUT_FILES="$ORIG_MAPPINGS"
 OUTPUT_FILES="$pairing_file"
-STATS_FILE=
-stage_command() {
+stage_command () {
     rm -f $pairing_file.tmp
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
 	no_sigpipe get_mappings_by_read_name $i | detect-pairing -f >>$pairing_file.tmp
 	let i+=1
     done
-    sed 's/\(^.*stddev=\([0-9]*\),.*$\)/\1\t\2/' <$pairing_file.tmp \
-	| sort -s -k 1,1 -k 4,4n \
-	| cut -f 1-3 \
-	| tawk 'BEGIN{last=""} {if ($1!=last) print; last=$1}' >$pairing_file.tmp.uniq
+    sed 's/\(^.*stddev=\([0-9]*\),.*$\)/\1\t\2/' <$pairing_file.tmp |
+    sort -s -k 1,1 -k 4,4n |
+    cut -f 1-3 |
+    tawk 'BEGIN{last=""} {if ($1!=last) print; last=$1}' >$pairing_file.tmp.uniq
     tawk -v n=$(wc -l <$pairing_file.tmp.uniq) \
 	'{$2=NR-1; while (length($2)<length(n-1)) $2="0" $2; print}' \
 	<$pairing_file.tmp.uniq >$pairing_file
@@ -164,7 +167,6 @@ STAGE_NUM=2
 STAGE_NAME="sort mappings if necessary"
 INPUT_FILES="$ORIG_MAPPINGS"
 OUTPUT_FILES=
-STATS_FILE=
 stage_command () {
     for file in ${orig_mappings[@]}; do
 	if (set +o pipefail; zc $file | head -n 1 | grep -q "coordinate"); then
@@ -199,24 +201,23 @@ STAGE_NUM=3
 STAGE_NAME="extract discordant reads"
 reads_to_remap=$ngs_name.$ref_name.reads.to_remap
 INPUT_FILES="$ORIG_MAPPINGS"
-OUTPUT_FILES="$reads_to_remap.*.[12].fq.gz"
-STATS_FILE=
+OUTPUT_FILES=$(for rg in $(cut -f 1 $pairing_file); do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done)
 stage_command () {
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
-	add_dummy_pairs=1 get_mappings_by_read_name $i \
-	    | add-extra-sam-flags -N 4 -l $pairing_file \
-	    | filter-concordant -N 4 -l $pairing_file 3>&1 >/dev/null \
-	    | sam-to-fq -s -l $pairing_file
+	add_dummy_pairs=1 get_mappings_by_read_name $i |
+	add-extra-sam-flags -N 4 -l $pairing_file |
+	filter-concordant -N 4 -l $pairing_file 3>&1 >/dev/null |
+	sam-to-fq -s -l $pairing_file
 	let i+=1
-    done \
-	| fq-trim-illumina-reads -v input_phred=33 \
-        | fq-remove-short-paired-reads \
-        | fq-rename-paired-reads-with-len -v ofq=tfq \
-	| sed 's/^\(.........\([0-9]\+\):\([12]\):\)/\2.\3\t\1/' \
-	| split-file-by-field -r --prefix $reads_to_remap. --suffix .fq.gz \
-	    --cmd "fq-convert -v ofq=fq | $ZIP" \
-	    -d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <$pairing_file)
+    done |
+    fq-trim-illumina-reads -v input_phred=33 |
+    fq-remove-short-paired-reads |
+    fq-rename-paired-reads-with-len -v ofq=tfq |
+    tawk '{split($1,a,":"); print a[1] "." a[3], $0;}' |
+    split-file-by-field -r --prefix $reads_to_remap. --suffix .fq.gz \
+	--cmd "fq-convert -v ofq=fq | gzip -9" \
+	-d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <$pairing_file)
 }
 run_stage
 
@@ -229,23 +230,18 @@ run_stage
 #
 STAGE_NUM=4
 STAGE_NAME="mapping to alternate alleles"
-if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-    mappings_to_alt=$ngs_name.$lib_name.map.to_ref+alt_lib
-else
-    mappings_to_alt=$ngs_name.$lib_name.map.to_alt_lib
-fi
-INPUT_FILES="$reads_to_remap.*.[12].fq.gz"
-OUTPUT_FILES="$mappings_to_alt.*.bam"
-STATS_FILE=
-stage_command() {
+mappings_to_alt=$ngs_name.$lib_name.map.to_ref+alt_lib
+INPUT_FILES=$(for rg in $(cut -f 1 $pairing_file); do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done)
+OUTPUT_FILES=$(for rg in $(cut -f 1 $pairing_file); do echo "$mappings_to_alt.$rg.bam"; done)
+stage_command () {
     while read -r -a line; do
 	make_note "remapping read group [${line[0]}]"
 	$PV $reads_to_remap.${line[0]}.1.fq.gz | zc |
 	bowtie2 -x $lib_bt2_idx -p $NCPU --phred33 --quiet \
 	    -1 - \
 	    -2 <(zc $reads_to_remap.${line[0]}.2.fq.gz) \
-	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} \
-	    | samtools view -Sb - >$mappings_to_alt.${line[0]}.bam
+	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} |
+	samtools view -Sb - >$mappings_to_alt.${line[0]}.bam
     done <$pairing_file
 }
 run_stage
@@ -259,17 +255,12 @@ run_stage
 #
 STAGE_NUM=5
 STAGE_NAME="sort alternate mappings"
-if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-    mappings_to_alt_sort=$ngs_name.$lib_name.map.to_ref+alt_lib_sort
-else
-    mappings_to_alt_sort=$ngs_name.$lib_name.map.to_alt_lib_sort
-fi
-INPUT_FILES="$mappings_to_alt.*.bam"
+mappings_to_alt_sort=$mappings_to_alt.merge.sort
+INPUT_FILES=$(for rg in $(cut -f 1 $pairing_file); do echo "$mappings_to_alt.$rg.bam"; done)
 OUTPUT_FILES="$mappings_to_alt_sort.bam"
-STATS_FILE=
-stage_command() {
-    samtools merge -u -h <(bam-merge-rg-headers $mappings_to_alt.*.bam) - \
-	$mappings_to_alt.*.bam | samtools sort -m 10000000000 - $mappings_to_alt_sort
+stage_command () {
+    samtools merge -u -h <(bam-merge-rg-headers $INPUT_FILES) - $INPUT_FILES |
+    samtools sort -m 10000000000 - $mappings_to_alt_sort.bam
     samtools index $mappings_to_alt_sort.bam
 }
 run_stage
@@ -280,15 +271,9 @@ run_stage
 #
 STAGE_NUM=6
 STAGE_NAME="gather evidence for reference allele"
-if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-    ref_evidence=$ngs_name.$lib_name.ref+alt.ref-evidence
-    INPUT_FILES="${sorted_mappings[@]:-} $mappings_to_alt_sort.bam"
-else
-    ref_evidence=$ngs_name.$lib_name.ref-evidence
-    INPUT_FILES=${sorted_mappings[@]:-}
-fi
+ref_evidence=$ngs_name.$lib_name.ref-evidence
+INPUT_FILES="${sorted_mappings[@]:-} $mappings_to_alt_sort.bam"
 OUTPUT_FILES=$ref_evidence.csv
-STATS_FILE=
 stage_command () {
     rm -f $ref_evidence.csv $ref_evidence.log
     while read -r -a line; do
@@ -301,19 +286,18 @@ stage_command () {
 		samtools view $f \
 		    $local_chr_name:$((${line[2]} + 1))-${line[3]}
 	    done
-	    if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-		samtools view $mappings_to_alt_sort.bam \
-		    ${line[1]}:$((${line[2]} + 1))-${line[3]}
-	    fi
-	} \
-	    | sam-filter-nm 3>>$ref_evidence.log \
-	    | add-dummy-pairs \
-	    | sam-rsort 2> >(grep -v "some paired reads" >&2) \
-	    | add-extra-sam-flags -N 4 -l $pairing_file \
-	    | filter-concordant -N 4 -l $pairing_file 3>/dev/null \
-	    | get-te-evidence -l $pairing_file -q $MIN_MQV -v \
+	    samtools view $mappings_to_alt_sort.bam \
+		${line[1]}:$((${line[2]} + 1))-${line[3]}
+	} |
+	sam-filter-nm 3>>$ref_evidence.log |
+	add-dummy-pairs |
+	sam-rsort 2> >(grep -v "some paired reads" >&2) |
+	add-extra-sam-flags -N 4 -l $pairing_file |
+	filter-concordant -N 4 -l $pairing_file 3>/dev/null |
+	get-te-evidence -l $pairing_file -q $MIN_MQV -v \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
-	    -s $((${line[2]} + 1)),${line[3]} >>$ref_evidence.csv 2>>$ref_evidence.log
+	    -s $((${line[2]} + 1)),${line[3]} \
+	    >>$ref_evidence.csv 2>>$ref_evidence.log
     done <$lib_csv
 }
 run_stage
@@ -324,26 +308,23 @@ run_stage
 #
 STAGE_NUM=7
 STAGE_NAME="gather evidence for alternate allele"
-if [ "${MAP_TO_ALT_AND_REF:-}" ]; then
-    alt_evidence=$ngs_name.$lib_name.ref+alt.alt-evidence
-else
-    alt_evidence=$ngs_name.$lib_name.alt-evidence
-fi
+alt_evidence=$ngs_name.$lib_name.alt-evidence
 INPUT_FILES=$mappings_to_alt_sort.bam
 OUTPUT_FILES=$alt_evidence.csv
-STATS_FILE=
 stage_command () {
     rm -f $alt_evidence.csv $alt_evidence.log
     while read -r -a line; do
 	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a $alt_evidence.log >&2
-	samtools view $mappings_to_alt_sort.bam ${line[8]}:$((${line[9]} + 1))-${line[10]} \
-	    | sam-filter-nm 3>>$alt_evidence.log \
-	    | sam-rsort --cid-parser cid_parser 2> >(grep -v "some paired reads" >&2) \
-	    | add-extra-sam-flags -N 4 -P -l $pairing_file \
-	    | filter-concordant -N 4 -P -l $pairing_file 3>/dev/null \
-	    | get-te-evidence -P -l $pairing_file -q $MIN_MQV -v \
+	samtools view $mappings_to_alt_sort.bam \
+	    ${line[8]}:$((${line[9]} + 1))-${line[10]} |
+	sam-filter-nm 3>>$alt_evidence.log |
+	sam-rsort --cid-parser cid_parser 2> >(grep -v "some paired reads" >&2) |
+	add-extra-sam-flags -N 4 -P -l $pairing_file |
+	filter-concordant -N 4 -P -l $pairing_file 3>/dev/null |
+	get-te-evidence -P -l $pairing_file -q $MIN_MQV -v \
 	    -t ${line[11]},${line[12]} -t ${line[13]},${line[14]} \
-	    -s $((${line[9]} + 1)),${line[10]} >>$alt_evidence.csv 2>>$alt_evidence.log
+	    -s $((${line[9]} + 1)),${line[10]} \
+	    >>$alt_evidence.csv 2>>$alt_evidence.log
     done <$lib_csv
 }
 run_stage

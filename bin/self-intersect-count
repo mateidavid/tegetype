@@ -2,15 +2,14 @@
 source lib.tegetype.sh
 set -eEu -o pipefail
 
-which drain >/dev/null 2>&1 || { echo "drain: not found" >&2; exit 1; }
-which tee-p >/dev/null 2>&1 || { echo "tee-p: not found" >&2; exit 1; }
-which bedtools >/dev/null 2>&1 || { echo "bedtools: not found" >&2; exit 1; }
+cmd_exists drain || { echo "drain: not found" >&2; exit 1; }
+cmd_exists tee-p || { echo "tee-p: not found" >&2; exit 1; }
+cmd_exists bedtools || { echo "bedtools: not found" >&2; exit 1; }
 
 strand=
 extension=0
 OPTIND=1
 while getopts "se:" OPT "$@"; do
-    #echo "got option: $OPT" 1>&2
     case $OPT in
 	s)
 	    strand=-s

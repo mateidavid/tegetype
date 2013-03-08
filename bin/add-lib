@@ -14,8 +14,8 @@ while getopts "m:" OPT "$@"; do
     case $OPT in
 	m)
 	    max_frag_size=$OPTARG
-	    ([[ "$max_frag_size" =~ ^[[:digit:]]*$ ]] && [ $max_frag_size -gt 0 ])\
-		|| crash "invalid max_frag_size [$max_frag_size]"
+	    ([[ "$max_frag_size" =~ ^[[:digit:]]*$ ]] && [ $max_frag_size -gt 0 ]) ||
+	    crash "invalid max_frag_size [$max_frag_size]"
 	    ;;
     esac
 done
@@ -26,15 +26,14 @@ if [ $# -ne 3 ]; then
     exit
 fi
 
-[[ "$1" =~ ^[[:alnum:]_-]*$ ]] || \
-    crash "illegal character in library name [$1]"
+[[ "$1" =~ ^[[:alnum:]_-]*$ ]] || crash "illegal character in library name [$1]"
 
 set_ref_var_names "$2"
 check_files_readable "$ref_fa" "$ref_fai" "$3"
 
 set_lib_var_names $1
 check_files_not_exist "$lib_settings_sh" "$lib_csv" "$lib_fa" \
-    "$lib_bt2_idx"{.1.bt2,.2.bt2,.3.bt2,.4.bt2,.rev.1.bt2,.rev.2.bt2}
+    "$lib_bt2_idx".{{1..4},rev.{1,2}}.bt2
 
 
 # check individual library entries

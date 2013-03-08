@@ -1,4 +1,7 @@
 #!/bin/bash
+#
+# Wrapper: set BASE_DIR, PATH, and AWKPATH
+#
 set -eEu -o pipefail
 this=${BASH_SOURCE[0]}
 while [ -h "$this" ]; do this=$(readlink "$this"); done
@@ -6,7 +9,6 @@ export BASE_DIR=$(cd -P "$(dirname "$this")"; pwd)
 source "$BASE_DIR"/bin/lib.tegetype.sh
 
 make_note "$(basename "$this") v$(cat $BASE_DIR/VERSION) (git:$($BASE_DIR/get_git_version)) installed in $BASE_DIR"
-[ ! -e /proc/$$/fd/3 ] || crash "fd 3 needs to be closed"
 
 add_to_path "$BASE_DIR"/bin PATH
 export AWKPATH=${AWKPATH:-}
@@ -15,10 +17,10 @@ add_to_path "$BASE_DIR"/bin AWKPATH
 prog_list=(add-ref list-ref del-ref add-lib list-lib del-lib getype)
 
 usage () {
-    echo "Use: $(basename "$this") <command> [options]" >&2
-    echo "Commands:" >&2
+    echo "Use: $(basename "$this") <command> [options]"
+    echo "Commands:"
     for f in ${prog_list[@]}; do
-	echo "    $f" >&2
+	echo "    $f"
     done
 }
 
@@ -34,5 +36,5 @@ for f in ${prog_list[@]}; do
     fi
 done
 echo "$1: command not found" >&2
-usage
+usage >&2
 exit 1
