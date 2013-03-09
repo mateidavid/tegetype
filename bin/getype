@@ -236,7 +236,7 @@ stage_command () {
 	    samtools view $mappings_to_alt_sort.bam \
 		${line[1]}:$((${line[2]} + 1))-${line[3]} |
 	    # return to original name to mix with original mappings
-	    tawk '{n=split($1,a,":"); $1=a[8]; for(i=9;i<=n;i++) $1=":"a[i]; print}'
+	    tawk '{n=split($1,a,":"); $1="remapped-"a[8]; for(i=9;i<=n;i++) $1=":"a[i]; print}'
 	} |
 	sam-filter-nm 3>>$ref_evidence.log |
 	add-dummy-pairs |
