@@ -232,22 +232,17 @@ stage_command () {
 		[ "$local_chr_name" ] || continue
 		samtools view $f \
 		    $local_chr_name:$((${line[2]} + 1))-${line[3]}
-	    done |
-	    sam-filter-nm 3>>$ref_evidence.log |
-	    add-dummy-pairs |
-	    sam-rsort 2> >(grep -v "some paired reads" >&2 || true) |
-	    add-extra-sam-flags -N 4 -l $pairing_file |
-	    filter-concordant -N 4 -l $pairing_file 3>/dev/null
-
+	    done
 	    samtools view $mappings_to_alt_sort.bam \
 		${line[1]}:$((${line[2]} + 1))-${line[3]} |
-	    sam-filter-nm 3>>$ref_evidence.log |
-	    add-dummy-pairs |
-	    sam-rsort --cid-parser cid_parser \
-		2> >(grep -v "some paired reads" >&2 || true) |
-	    add-extra-sam-flags -N 4 -P -l $pairing_file |
-	    filter-concordant -N 4 -P -l $pairing_file 3>/dev/null
+	    # return to original name to mix with original mappings
+	    tawk '{n=split($1,a,":"); $1=a[8]; for(i=9;i<=n;i++) $1=":"a[i]; print}'
 	} |
+	sam-filter-nm 3>>$ref_evidence.log |
+	add-dummy-pairs |
+	sam-rsort 2> >(grep -v "some paired reads" >&2 || true) |
+	add-extra-sam-flags -N 4 -l $pairing_file |
+	filter-concordant -N 4 -l $pairing_file 3>/dev/null |
 	get-te-evidence -l $pairing_file -q $MIN_MQV -v \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
 	    -s $((${line[2]} + 1)),${line[3]} \
