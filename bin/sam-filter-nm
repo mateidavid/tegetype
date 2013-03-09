@@ -3,10 +3,10 @@ set -eEu -o pipefail
 
 exec < <(exec zc "$@")
 exec {stdout_direct}>&1
-tee-p >(exec sam-header >&$stdout_direct) \
-    | { \
-	sam-body \
-	    | tawk -v max_nm=${MAX_NM:-20} \
+tee-p >(exec sam-header >&$stdout_direct) |
+{
+    sam-body |
+    tawk -v max_nm=${MAX_NM:-20} \
 '
 {
   i=12;
@@ -18,4 +18,4 @@ tee-p >(exec sam-header >&$stdout_direct) \
   print;
 }
 '
-      } {stdout_direct}>&-
+} {stdout_direct}>&-
