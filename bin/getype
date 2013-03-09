@@ -207,7 +207,7 @@ INPUT_FILES=$(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; don
 OUTPUT_FILES="$mappings_to_alt_sort.bam"
 stage_command () {
     samtools merge -u -h <(bam-merge-rg-headers $INPUT_FILES) - $INPUT_FILES |
-    samtools sort -m 10000000000 - $mappings_to_alt_sort.bam
+    samtools sort -m 10000000000 - $mappings_to_alt_sort
     samtools index $mappings_to_alt_sort.bam
 }
 run_stage
@@ -232,15 +232,22 @@ stage_command () {
 		[ "$local_chr_name" ] || continue
 		samtools view $f \
 		    $local_chr_name:$((${line[2]} + 1))-${line[3]}
-	    done
+	    done |
+	    sam-filter-nm 3>>$ref_evidence.log |
+	    add-dummy-pairs |
+	    sam-rsort 2> >(grep -v "some paired reads" >&2 || true) |
+	    add-extra-sam-flags -N 4 -l $pairing_file |
+	    filter-concordant -N 4 -l $pairing_file 3>/dev/null
+
 	    samtools view $mappings_to_alt_sort.bam \
-		${line[1]}:$((${line[2]} + 1))-${line[3]}
+		${line[1]}:$((${line[2]} + 1))-${line[3]} |
+	    sam-filter-nm 3>>$ref_evidence.log |
+	    add-dummy-pairs |
+	    sam-rsort --cid-parser cid_parser \
+		2> >(grep -v "some paired reads" >&2 || true) |
+	    add-extra-sam-flags -N 4 -P -l $pairing_file |
+	    filter-concordant -N 4 -P -l $pairing_file 3>/dev/null
 	} |
-	sam-filter-nm 3>>$ref_evidence.log |
-	add-dummy-pairs |
-	sam-rsort 2> >(grep -v "some paired reads" >&2) |
-	add-extra-sam-flags -N 4 -l $pairing_file |
-	filter-concordant -N 4 -l $pairing_file 3>/dev/null |
 	get-te-evidence -l $pairing_file -q $MIN_MQV -v \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
 	    -s $((${line[2]} + 1)),${line[3]} \
@@ -265,7 +272,8 @@ stage_command () {
 	samtools view $mappings_to_alt_sort.bam \
 	    ${line[8]}:$((${line[9]} + 1))-${line[10]} |
 	sam-filter-nm 3>>$alt_evidence.log |
-	sam-rsort --cid-parser cid_parser 2> >(grep -v "some paired reads" >&2) |
+	sam-rsort --cid-parser cid_parser \
+	    2> >(grep -v "some paired reads" >&2 || true) |
 	add-extra-sam-flags -N 4 -P -l $pairing_file |
 	filter-concordant -N 4 -P -l $pairing_file 3>/dev/null |
 	get-te-evidence -P -l $pairing_file -q $MIN_MQV -v \
