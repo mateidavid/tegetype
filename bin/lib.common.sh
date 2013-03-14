@@ -26,7 +26,25 @@ check_files_not_exist () {
 }
 
 quote () { 
-    echo \'${1//\'/\'\\\'\'}\'
+    while [ $# -gt 0 ]; do
+	echo \'${1//\'/\'\\\'\'}\'
+	shift
+    done
+}
+
+arg_product () {
+    local tmp=""
+    local a
+    while [ $# -gt 0 ]; do
+	a=($(quote $1))
+	if [ ${#a[@]} -eq 1 ]; then
+	    tmp=$tmp$a
+	elif [ ${#a[@]} -gt 1 ]; then
+	    tmp=$tmp{$(IFS=,; echo "${a[*]}")}
+	fi
+	shift
+    done
+    eval echo $tmp
 }
 
 # use: add_to_path /a/new/dir AWKPATH
@@ -161,24 +179,23 @@ run_stage () {
 run_cmds() {
     [ $# -ge 1 ] || crash "run_cmds needs arguments"
     local pid=$BASHPID
-    local fd=$(get_unused_fd $pid)
     local cmds_string=
     local crt_cmd=1
     while [ $# -ge 2 ]; do
-        cmds_string="$cmds_string tee-p >(echo \"$crt_cmd \$($1)\" >&$fd) |"
+        cmds_string="$cmds_string tee-p >(echo \"$crt_cmd \$($1)\" >&\$fd) |"
         let crt_cmd+=1
         shift
     done
-    cmds_string="$cmds_string echo \"$crt_cmd \$($1)\" >&$fd"
-    echo "cmds_string:$cmds_string" >&2
-    local cmds_raw_output=$( { eval $cmds_string ; } {fd}>&1 )
-    echo "cmds_raw_output:$cmds_raw_output" >&2
+    cmds_string="$cmds_string echo \"$crt_cmd \$($1)\" >&\$fd"
+#    echo "cmds_string:$cmds_string" >&2
+    local cmds_raw_output=$( exec {fd}>&1; eval $cmds_string; )
+#    echo "cmds_raw_output:$cmds_raw_output" >&2
     CMD_OUTPUT=()
     local i
     for i in $(seq 1 $crt_cmd); do
         CMD_OUTPUT[$i]=$(echo "$cmds_raw_output" | grep "^$i " | cut -d " " -f 2-)
     done
-    echo "CMD_OUTPUT:${CMD_OUTPUT[@]}" >&2
+#    echo "CMD_OUTPUT:${CMD_OUTPUT[@]}" >&2
 }
 
 #
@@ -339,7 +356,7 @@ double_pipe () (
     {
 	make_note "$0: undefined splitter; using default"
 	splitter () {
-	    exec tee-p >(exec cat >$out_fd)
+	    exec tee-p >(exec cat >&$out_fd)
 	}
     }
     (set +o pipefail; type -t joiner | grep -q function) || crash "$0: joiner undefined"
