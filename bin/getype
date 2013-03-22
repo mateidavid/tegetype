@@ -79,7 +79,7 @@ orig_mappings=($(ls $ORIG_MAPPINGS))
 for f in ${orig_mappings[@]}; do
     (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM") ||
     crash "$f: not a BAM file"
-    (set +o pipefail; zc $f | head -n 1 | grep -q "coordinate") ||
+    (set +o pipefail; samtools view -H $f | head -n 1 | grep -q "coordinate") ||
     crash "$f: not sorted by coordinate"
 done
 
