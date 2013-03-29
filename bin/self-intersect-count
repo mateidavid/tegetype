@@ -1,15 +1,16 @@
 #!/bin/bash
-source lib.tegetype.sh
+source lib.common.sh
 set -eEu -o pipefail
 
-cmd_exists drain || { echo "drain: not found" >&2; exit 1; }
-cmd_exists tee-p || { echo "tee-p: not found" >&2; exit 1; }
-cmd_exists bedtools || { echo "bedtools: not found" >&2; exit 1; }
+cmd_exists drain || crash "drain: not found"
+cmd_exists tee-p || crash "tee-p: not found"
+cmd_exists bedtools || crash "bedtools: not found"
 
 strand=
 extension=0
+use_zc=
 OPTIND=1
-while getopts "se:" OPT "$@"; do
+while getopts "se:z" OPT "$@"; do
     case $OPT in
 	s)
 	    strand=-s
@@ -17,9 +18,14 @@ while getopts "se:" OPT "$@"; do
 	e)
 	    extension=$OPTARG
 	    ;;
+	z)
+	    use_zc=1
+	    ;;
     esac
 done
 shift $(($OPTIND - 1))
+
+([ $# -eq 0 ] && [ ! $use_zc ]) || { exec < <(exec zc "$@"); make_note "using zc"; }
 
 splitter () {
     exec tee-p >(exec cat >&$out_fd)
