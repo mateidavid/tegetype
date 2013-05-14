@@ -257,7 +257,7 @@ gen_file () {
 	fi
     fi
 
-    if [ $need_to_run = 1 ] ; then
+    if [ $need_to_run ] ; then
 	make_note "need to run"
 	typeset -f COMMAND >&2
 	if ask_confirmation ; then
@@ -266,7 +266,7 @@ gen_file () {
 		set -o pipefail
 		COMMAND |
 		{
-		    if [ "$PRINT_OUTPUT" ]; then
+		    if [ ! "$PRINT_OUTPUT" ]; then
 			exec cat >"$OUTPUT_FILE"
 		    else
 			exec tee-p "$OUTPUT_FILE"
