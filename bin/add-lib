@@ -5,7 +5,7 @@ set -eEu -o pipefail
 data_dir=$BASE_DIR/data
 
 usage () {
-    echo "Use: $(basename $0) [-m <max_frag_size>] <lib_name> <ref_name> <lib_file>" >&2
+    echo "Use: $(basename $0) [-m <max_frag_size>] <lib_name> <ref_name> <lib_file>"
 }
 
 max_frag_size=1000
@@ -22,7 +22,7 @@ done
 shift $(($OPTIND - 1))
 
 if [ $# -ne 3 ]; then
-    usage
+    usage >&2
     exit
 fi
 
@@ -214,4 +214,4 @@ BEGIN {
 bowtie2-build "$lib_fa" "$lib_bt2_idx"
 
 
-make_note "added reference [$1]"
+make_note "added te library [$1]"
