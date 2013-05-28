@@ -13,6 +13,7 @@ import lib_alu_detect_sam as sam
 
 max_Ns = 10
 n_GC_bins = 100
+progress_bar = 1000
 
 parser = argparse.ArgumentParser(description=sys.argv[0])
 parser.add_argument('-v', '--verbose', action='append_const', const=1, default=[], dest='verbose')
@@ -66,6 +67,7 @@ if args.seed:
     cmd_line_basic = cmd_line
 note('cmd_line = [' + cmd_line + ']', 1)
 
+note('building region list of length [' + str(args.n) + ']', 1)
 reg_list = list()
 while len(reg_list) < args.n:
     if args.seed:
@@ -112,6 +114,8 @@ while len(reg_list) < args.n:
 
         # save region in region list
         reg_list.append(d)
+        if len(reg_list) % progress_bar == 0:
+            note(str(len(reg_list)), 1)
         #note('added region: ' + d['region_id'], 1)
 
         if len(reg_list) >= args.n:
@@ -120,7 +124,9 @@ while len(reg_list) < args.n:
     run_idx += 1
 
 # go through list of regions, retrieve mappings, save fragment read groups
-for reg in reg_list:
+note('retrieve mappings', 1)
+for reg_idx in xrange(len(reg_list)):
+    reg = reg_list[reg_idx]
     cmd_line = ('samtools view ' + args.mappings_file + ' ' + reg['chr'] + ':'
                 + str(reg['pos']) + '-' + str(reg['pos'])
                 + " | awk -F '\\t' '$4==" + str(reg['pos']) + "'")
@@ -142,6 +148,9 @@ for reg in reg_list:
             note('found fragment from rg [' + ','.join(rg['rg_name']) + '] at pos ['
                  + reg['region_id'] + ']', 1)
             reg['rg_list'][rg['rg_idx']]['frag_count'] += 1
+
+    if (reg_idx + 1) % progress_bar == 0:
+        note(str(reg_idx + 1), 1)
 
 #print [d for d in rg_list[0]['bin_list'][3]['region_list']]
 #sys.exit(0)
