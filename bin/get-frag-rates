@@ -112,7 +112,7 @@ while len(reg_list) < args.n:
 
         # save region in region list
         reg_list.append(d)
-        note('added region: ' + d['region_id'])
+        #note('added region: ' + d['region_id'], 1)
 
         if len(reg_list) >= args.n:
             break
@@ -124,7 +124,7 @@ for reg in reg_list:
     cmd_line = ('samtools view ' + args.mappings_file + ' ' + reg['chr'] + ':'
                 + str(reg['pos']) + '-' + str(reg['pos'])
                 + " | awk -F '\\t' '$4==" + str(reg['pos']) + "'")
-    note('cmd_line = [' + cmd_line + ']', 2)
+    #note('cmd_line = [' + cmd_line + ']', 2)
 
 #    stdout = subprocess.check_output(['/bin/bash', '-c', cmd_line])
 #    for l in stdout.strip().split('\n'):
