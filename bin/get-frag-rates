@@ -83,7 +83,9 @@ while len(reg_list) < args.n:
         cmd_line2 = ('samtools faidx ' + args.ref_fa + ' ' + interval_chr + ':'
                      + str(interval_start) + '-' + str(interval_end)
                      + " | tail -n +2 | tr -d '\n'")
-        seq = subprocess.check_output(['/bin/bash', '-c', cmd_line2]).upper()
+        p = subprocess.Popen(['/bin/bash', '-c', cmd_line2], stdout=subprocess.PIPE)
+        (stdout, stderr) = p.communicate()
+        seq = stdout.upper()
         #note('got seq: [' + seq + '] len: [' + str(len(seq)) + ']', 2)
 
         # check number of Ns
