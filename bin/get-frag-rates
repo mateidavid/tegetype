@@ -155,6 +155,20 @@ for reg_idx in xrange(len(reg_list)):
 #print [d for d in rg_list[0]['bin_list'][3]['region_list']]
 #sys.exit(0)
 
+
+# for each region, print location, and (gc pct and frag_count) per rg
+for reg_idx in xrange(len(reg_list)):
+    reg = reg_list[reg_idx]
+    print '\t'.join(
+        map(str,
+            [reg['chr'], reg['pos']] +
+            sum(map(lambda e: [e['bin_idx'], e['frag_count']], reg['rg_list']),
+                []
+                )
+            )
+        )
+
+
 # print histogram per each read group
 for rg_idx in xrange(len(rg_list)):
     rg = rg_list[rg_idx]
