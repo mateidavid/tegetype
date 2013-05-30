@@ -1,0 +1,214 @@
+#!/usr/bin/env python
+import signal
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+import sys
+import argparse
+import gzip
+import subprocess
+import operator
+import math
+from lib_alu_detect import *
+import lib_alu_detect_sam as sam
+
+max_Ns = 10
+n_GC_bins = 100
+progress_bar = 1000
+max_reg_size = 10000
+
+parser = argparse.ArgumentParser(description=sys.argv[0])
+parser.add_argument('-v', '--verbose', action='append_const', const=1, default=[], dest='verbose')
+parser.add_argument('-s', '--seed', action='store', type=int, dest='seed')
+parser.add_argument('-n', '--num-samples', action='store', type=int, default=100000, dest='n')
+
+parser.add_argument('-f', '--fasta', required=True, action='store', dest='ref_fa')
+parser.add_argument('-i', '--fasta-index', required=True, action='store', dest='ref_fai')
+parser.add_argument('-l', '--pairing-file', required=True, action='store', dest='pairing_file')
+parser.add_argument('-m', '--mappings', required=True, action='store', dest='mappings_file')
+args = parser.parse_args()
+set_log_level(len(args.verbose))
+
+
+# read in read group info
+rg_name_dict = dict()
+#rg_id_dict = dict()
+rg_list = list()
+pairing_file_fd = gzopen(args.pairing_file)
+for l in pairing_file_fd:
+    l = l.strip().split('\t')
+    d = dict()
+    d['rg_name'] = l[0].split(',')
+    d['rg_id'] = l[1]
+    d['rg_idx'] = len(rg_list)
+    d['pairing_string'] = l[2]
+    for e in l[2].split(','):
+        e = e.split('=')
+        d[e[0]] = e[1]
+    d['mean'] = int(d['mean'])
+    d['bin_list'] = [{'count': 0, 'frag_count': 0}
+                     for _ in xrange(n_GC_bins)]
+    note('found rg: ' + str(d), 1)
+    for name in d['rg_name']:
+        rg_name_dict[name] = d
+    #rg_id_dict[d['rg_id']] = d
+    rg_list.append(d)
+
+mean_frag_list = [d['mean'] for d in rg_list]
+note('mean_frag_list = ' + str(mean_frag_list), 1)
+mean_frag_unique_list = list(set(mean_frag_list))
+mean_frag_unique_list.sort()
+note('mean_frag_unique_list = ' + str(mean_frag_unique_list), 1)
+max_mean_frag = mean_frag_unique_list[-1]
+note('max_mean_frag = ' + str(max_mean_frag), 1)
+
+
+# create list of locations to sample
+cmd_line = 'bedtools random -g ' + args.ref_fai + ' -l 1'
+run_idx = 0
+if args.seed:
+    cmd_line_basic = cmd_line
+note('cmd_line = [' + cmd_line + ']', 1)
+
+n_regs = 0
+while n_regs < args.n:
+    run_idx += 1
+    if args.seed:
+        cmd_line = cmd_line_basic + ' -seed ' + str(int(args.seed) + run_idx - 1)
+
+    p1 = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE)
+    for l in p1.stdout:
+        #note('got: ' + l.strip(), 1)
+        if n_regs >= args.n:
+            break
+
+        l = l.strip().split('\t')
+        interval_chr = l[0]
+        interval_start = int(l[1]) + 1
+
+        # for every read group, retrieve mappings following this location
+        frags_per_rg = [list() for _ in xrange(len(rg_list))]
+        cmd_line2 = ('samtools view ' + args.mappings_file + ' '
+                     + interval_chr + ':' + str(interval_start)
+                     + " | tawk '$4>=" + str(interval_start) + "'")
+        note('cmd_line2: [' + cmd_line2 + ']', 1)
+
+        #mappings_seen = 0
+        rg_goal = 0
+        p2 = subprocess.Popen(['/bin/bash', '-c', cmd_line2], stdout=subprocess.PIPE)
+        for ms in sam.get_mapping_set_gen(p2.stdout):
+            done_with_region = False
+            for d in ms:
+                if d['chr'] != interval_chr:
+                    done_with_region = True
+                    break
+                if not d['mapped']:
+                    continue
+                rg = rg_name_dict[d['RG']]
+                sam.set_pairing(rg['pairing_string'])
+                if not sam.is_mp_downstream(d['nip'], d['st']):
+                    continue
+                #mappings_seen += 1
+
+                # found fragment start from read group rg:
+                # if we already have fragments from rg, record it iff at same pos
+                rg_idx = rg['rg_idx']
+                if (len(frags_per_rg[rg_idx]) > 0 and
+                    d['pos'] != frags_per_rg[rg_idx][0]['pos']):
+                    # are we done? reset rg_goal
+                    while rg_goal < len(rg_list):
+                        if len(frags_per_rg[rg_goal]) > 0:
+                            rg_goal += 1
+                        else:
+                            break
+                    if rg_goal >= len(rg_list):
+                        done_with_region = True
+                    continue
+                frags_per_rg[rg_idx].append(d)
+            if done_with_region:
+                break
+        p2.terminate()
+
+        # find how far we need to compute GC content
+        found_all_rgs = True
+        for rg_idx in xrange(len(rg_list)):
+            if len(frags_per_rg[rg_idx]) == 0:
+                found_all_rgs = False
+        if found_all_rgs:
+            interval_end = max([frags_per_rg[rg_idx][0]['pos'] + rg_list[rg_idx]['mean'] - 1
+                                for rg_idx in xrange(len(rg_list))])
+            note('found region at [' + interval_chr + ':' + str(interval_start)
+                 + '] of size [' + str(interval_end - interval_start + 1) + ']', 1)
+            if interval_end - interval_start + 1 > max_reg_size:
+                note('too large: skipping', 1)
+            cmd_line3 = ('samtools faidx ' + args.ref_fa + ' ' + interval_chr + ':'
+                         + str(interval_start) + '-' + str(interval_end)
+                         + " | tail -n +2 | tr -d '\n'")
+        else:
+            note('found open region at [' + interval_chr + ':' + str(interval_start)
+                 + ']: skipping', 1)
+            continue
+            cmd_line3 = ('samtools faidx ' + args.ref_fa + ' ' + interval_chr + ':'
+                         + str(interval_start)
+                         + " | tail -n +2 | tr -d '\n'")
+        n_regs += 1
+
+        # get actual sequence
+        p3 = subprocess.Popen(['/bin/bash', '-c', cmd_line3], stdout=subprocess.PIPE)
+        (stdout, stderr) = p3.communicate()
+        seq = stdout.upper()
+        if seq.count('N') > max_Ns:
+            note('too many Ns: skipping', 1)
+            continue
+        #note('got seq: [' + seq + '] len: [' + str(len(seq)) + ']', 2)
+
+        # update rg counts and frag_counts by sliding window until first mapping
+        for rg in rg_list:
+            rg_idx = rg['rg_idx']
+            offset = 0
+            crt_N = seq[:rg['mean']].count('N')
+            crt_GC = len([x for x in seq[:rg['mean']] if x in 'GC'])
+            bin_idx = int((float(crt_GC) / (rg['mean'] + 1)) * n_GC_bins)
+            while ((len(frags_per_rg[rg_idx]) == 0
+                    and interval_start + offset + rg['mean'] - 1 < interval_end)
+                   or (len(frags_per_rg[rg_idx]) > 0
+                       and interval_start + offset < frags_per_rg[rg_idx][0]['pos'])):
+                if crt_N <= max_Ns:
+                    # sampled a 0
+                    rg['bin_list'][bin_idx]['count'] += 1
+                    #note('rg_idx:[' + str(rg_idx) + '] pos:[' + interval_chr + ':' + str(interval_start + offset) + '] bin_idx:[' + str(bin_idx) + '] count+=1', 2)
+                # slide window along
+                if seq[offset] == 'N':
+                    crt_N -= 1
+                elif seq[offset] in 'GC':
+                    crt_GC -= 1
+                offset += 1
+                if seq[offset + rg['mean'] - 1] == 'N':
+                    crt_N += 1
+                elif seq[offset + rg['mean'] - 1] in 'GC':
+                    crt_GC += 1
+
+            if crt_N <= max_Ns:
+                rg['bin_list'][bin_idx]['count'] += 1
+                #note('rg_idx:[' + str(rg_idx) + '] pos:[' + interval_chr + ':' + str(interval_start + offset) + '] bin_idx:[' + str(bin_idx) + '] count+=1', 2)
+                if len(frags_per_rg[rg_idx]) > 0:
+                    # sampled num of frags
+                    rg['bin_list'][bin_idx]['frag_count'] += len(frags_per_rg[rg_idx])
+                    #note('rg_idx:[' + str(rg_idx) + '] pos:[' + interval_chr + ':' + str(interval_start + offset) + '] bin_idx:[' + str(bin_idx) + '] frag_count+=' + str(len(frags_per_rg[rg_idx])), 2)
+
+    p1.terminate()
+
+
+# print histogram per each read group
+for rg_idx in xrange(len(rg_list)):
+    rg = rg_list[rg_idx]
+    #note('rg = ' + str(rg), 1)
+    for bin_idx in xrange(n_GC_bins):
+        print '\t'.join(
+            map(str, [','.join(rg['rg_name']),
+                      bin_idx,
+                      int(math.ceil((float(bin_idx)/n_GC_bins)*(rg['mean'] + 1))),
+                      rg['bin_list'][bin_idx]['count'],
+                      rg['bin_list'][bin_idx]['frag_count']
+                      ]
+                )
+            )
