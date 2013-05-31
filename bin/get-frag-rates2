@@ -126,7 +126,8 @@ while n_regs < args.n:
                 frags_per_rg[rg_idx].append(d)
             if done_with_region:
                 break
-        p2.terminate()
+
+        p2.stdout.close()
 
         # find how far we need to compute GC content
         found_all_rgs = True
@@ -154,8 +155,7 @@ while n_regs < args.n:
 
         # get actual sequence
         p3 = subprocess.Popen(['/bin/bash', '-c', cmd_line3], stdout=subprocess.PIPE)
-        (stdout, stderr) = p3.communicate()
-        seq = stdout.upper()
+        seq = p3.communicate()[0].upper()
         if seq.count('N') > max_Ns:
             note('too many Ns: skipping', 1)
             continue
@@ -195,7 +195,7 @@ while n_regs < args.n:
                     rg['bin_list'][bin_idx]['frag_count'] += len(frags_per_rg[rg_idx])
                     #note('rg_idx:[' + str(rg_idx) + '] pos:[' + interval_chr + ':' + str(interval_start + offset) + '] bin_idx:[' + str(bin_idx) + '] frag_count+=' + str(len(frags_per_rg[rg_idx])), 2)
 
-    p1.terminate()
+    p1.stdout.close()
 
 
 # print histogram per each read group
