@@ -103,7 +103,7 @@ while n_regs < args.n_regs:
         cmd_line2 = ('samtools view ' + args.mappings_file + ' '
                      + interval_chr + ':' + str(interval_start)
                      + " | tawk '$4>=" + str(interval_start) + "'")
-        note('cmd_line2: [' + cmd_line2 + ']', 1)
+        note('cmd_line2: [' + cmd_line2 + ']', 2)
 
         #mappings_seen = 0
         rg_goal = 0
@@ -151,15 +151,15 @@ while n_regs < args.n_regs:
             interval_end = max([frags_per_rg[rg_idx][0]['pos'] + rg_list[rg_idx]['mean'] - 1
                                 for rg_idx in xrange(len(rg_list))])
             note('found region at [' + interval_chr + ':' + str(interval_start)
-                 + '] of size [' + str(interval_end - interval_start + 1) + ']', 1)
+                 + '] of size [' + str(interval_end - interval_start + 1) + ']', 2)
             if interval_end - interval_start + 1 > max_reg_size:
-                note('too large: skipping', 1)
+                note('too large: skipping', 2)
             cmd_line3 = ('samtools faidx ' + args.ref_fa + ' ' + interval_chr + ':'
                          + str(interval_start) + '-' + str(interval_end)
                          + " | tail -n +2 | tr -d '\n'")
         else:
             note('found open region at [' + interval_chr + ':' + str(interval_start)
-                 + ']: skipping', 1)
+                 + ']: skipping', 2)
             continue
             cmd_line3 = ('samtools faidx ' + args.ref_fa + ' ' + interval_chr + ':'
                          + str(interval_start)
@@ -172,7 +172,7 @@ while n_regs < args.n_regs:
         p3 = subprocess.Popen(['/bin/bash', '-c', cmd_line3], stdout=subprocess.PIPE)
         seq = p3.communicate()[0].upper()
         if seq.count('N') > max_Ns:
-            note('too many Ns: skipping', 1)
+            note('too many Ns: skipping', 2)
             continue
         #note('got seq: [' + seq + '] len: [' + str(len(seq)) + ']', 2)
 
