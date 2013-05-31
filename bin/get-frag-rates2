@@ -76,7 +76,7 @@ note('remaining contigs: ' + ' '.join(leftover_contigs.strip().split('\n')), 1)
 
 
 # create list of locations to sample
-cmd_line = 'bedtools random -g <(grep -F "' + leftover_contigs + '"' + args.ref_fai + ') -l 1'
+cmd_line = 'bedtools random -g <(grep -F "' + leftover_contigs + '" ' + args.ref_fai + ') -l 1'
 run_idx = 0
 if args.seed:
     cmd_line_basic = cmd_line
