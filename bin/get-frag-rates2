@@ -64,23 +64,24 @@ note('max_mean_frag = ' + str(max_mean_frag), 1)
 
 # get list of contigs from faidx not present in bam file
 cmd_line = 'diff <(cut -f 1 ' + args.ref_fai + ' | sort) <(samtools view -H ' + args.mappings_file + ' | grep "^@SQ" | tr "\t" "\n" | grep "^SN:" | cut -c 4- | sort) | grep "^<" | cut -c 3-'
-missing_contigs = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE).communicate()[0]
-note('contings missing from mappings: ' + ' '.join(missing_contigs.strip().split('\n')), 1)
+missing_contigs = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE).communicate()[0].strip().split('\n')
+note('contings missing from mappings: [' + ','.join(missing_contigs) + ']', 1)
 
-cmd_line = 'grep -v -F "' + missing_contigs + '" ' + args.ref_fai + ' | cut -f 1'
-leftover_contigs = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE).communicate()[0]
-if len(leftover_contigs.strip()) == 0:
+cmd_line = 'grep -v -E "^(' + '|'.join(missing_contigs) + ')\t" ' + args.ref_fai + ' | cut -f 1'
+remaining_contigs = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE).communicate()[0].strip().split('\n')
+if len(remaining_contigs[0]) == 0:
     note('no contigs left')
     sys.exit(1)
-note('remaining contigs: ' + ' '.join(leftover_contigs.strip().split('\n')), 1)
+note('remaining contigs: [' + ','.join(remaining_contigs) + ']', 1)
 
 
 # create list of locations to sample
-cmd_line = 'bedtools random -g <(grep -F "' + leftover_contigs + '" ' + args.ref_fai + ') -l 1'
+cmd_line = 'bedtools random -g <(grep -E "^(' + '|'.join(remaining_contigs) + ')\t" ' + args.ref_fai + ') -l 1'
 run_idx = 0
 if args.seed:
     cmd_line_basic = cmd_line
 note('cmd_line = [' + cmd_line + ']', 1)
+
 
 n_regs = 0
 while n_regs < args.n_regs:
