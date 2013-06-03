@@ -145,8 +145,7 @@ for reg_idx in xrange(len(reg_list)):
             sam.set_pairing(rg['pairing_string'])
             if not sam.is_mp_downstream(d['nip'], d['st']):
                 continue
-            note('found fragment from rg [' + ','.join(rg['rg_name']) + '] at pos ['
-                 + reg['region_id'] + ']', 1)
+            note('found fragment from rg [' + ','.join(rg['rg_name']) + '] at pos [' + reg['region_id'] + ']', 2)
             reg['rg_list'][rg['rg_idx']]['frag_count'] += 1
 
     if (reg_idx + 1) % progress_bar == 0:
