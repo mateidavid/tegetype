@@ -13,12 +13,12 @@ import lib_alu_detect_sam as sam
 
 max_Ns = 10
 n_GC_bins = 100
-progress_bar = 1000
 
 parser = argparse.ArgumentParser(description=sys.argv[0])
 parser.add_argument('-v', '--verbose', action='append_const', const=1, default=[], dest='verbose')
 parser.add_argument('-s', '--seed', action='store', type=int, dest='seed')
 parser.add_argument('-n', '--num-samples', action='store', type=int, default=100000, dest='n')
+parser.add_argument('-p', '--progress', action='store', type=int, default=1000, dest='progress')
 
 parser.add_argument('-f', '--fasta', required=True, action='store', dest='ref_fa')
 parser.add_argument('-i', '--fasta-index', required=True, action='store', dest='ref_fai')
@@ -60,8 +60,20 @@ note('mean_frag_unique_list = ' + str(mean_frag_unique_list), 1)
 max_mean_frag = mean_frag_unique_list[-1]
 note('max_mean_frag = ' + str(max_mean_frag), 1)
 
+# get list of contigs from faidx not present in bam file
+cmd_line = 'diff <(cut -f 1 ' + args.ref_fai + ' | sort) <(samtools view -H ' + args.mappings_file + ' | grep "^@SQ" | tr "\t" "\n" | grep "^SN:" | cut -c 4- | sort) | grep "^<" | cut -c 3-'
+missing_contigs = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE).communicate()[0].strip().split('\n')
+note('contings missing from mappings: [' + ','.join(missing_contigs) + ']', 1)
+
+cmd_line = 'grep -v -E "^(' + '|'.join(missing_contigs) + ')\t" ' + args.ref_fai + ' | cut -f 1'
+remaining_contigs = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE).communicate()[0].strip().split('\n')
+if len(remaining_contigs[0]) == 0:
+    note('no contigs left')
+    sys.exit(1)
+note('remaining contigs: [' + ','.join(remaining_contigs) + ']', 1)
+
 # create list of locations to sample
-cmd_line = 'bedtools random -g ' + args.ref_fai + ' -l ' + str(max_mean_frag)
+cmd_line = 'bedtools random -g <(grep -E "^(' + '|'.join(remaining_contigs) + ')\t" ' + args.ref_fai + ') -l ' + str(max_mean_frag)
 run_idx = 0
 if args.seed:
     cmd_line_basic = cmd_line
@@ -70,10 +82,12 @@ note('cmd_line = [' + cmd_line + ']', 1)
 note('building region list of length [' + str(args.n) + ']', 1)
 reg_list = list()
 while len(reg_list) < args.n:
+    run_idx += 1
     if args.seed:
-        cmd_line = cmd_line_basic + ' -seed ' + str(int(args.seed) + run_idx)
+        cmd_line = cmd_line_basic + ' -seed ' + str(int(args.seed) + run_idx - 1)
 
-    for l in subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE).stdout:
+    p1 = subprocess.Popen(['/bin/bash', '-c', cmd_line], stdout=subprocess.PIPE)
+    for l in p1.stdout:
         #note('got: ' + l.strip(), 1)
 
         l = l.strip().split('\t')
@@ -85,9 +99,7 @@ while len(reg_list) < args.n:
         cmd_line2 = ('samtools faidx ' + args.ref_fa + ' ' + interval_chr + ':'
                      + str(interval_start) + '-' + str(interval_end)
                      + " | tail -n +2 | tr -d '\n'")
-        p = subprocess.Popen(['/bin/bash', '-c', cmd_line2], stdout=subprocess.PIPE)
-        (stdout, stderr) = p.communicate()
-        seq = stdout.upper()
+        seq = subprocess.Popen(['/bin/bash', '-c', cmd_line2], stdout=subprocess.PIPE).communicate()[0].upper()
         #note('got seq: [' + seq + '] len: [' + str(len(seq)) + ']', 2)
 
         # check number of Ns
@@ -120,8 +132,6 @@ while len(reg_list) < args.n:
 
         if len(reg_list) >= args.n:
             break
-
-    run_idx += 1
 
 # go through list of regions, retrieve mappings, save fragment read groups
 note('retrieve mappings', 1)
