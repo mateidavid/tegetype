@@ -126,7 +126,7 @@ while len(reg_list) < args.n:
 
         # save region in region list
         reg_list.append(d)
-        if len(reg_list) % progress_bar == 0:
+        if len(reg_list) % args.progress == 0:
             note(str(len(reg_list)), 1)
         #note('added region: ' + d['region_id'], 1)
 
@@ -158,7 +158,7 @@ for reg_idx in xrange(len(reg_list)):
             note('found fragment from rg [' + ','.join(rg['rg_name']) + '] at pos [' + reg['region_id'] + ']', 2)
             reg['rg_list'][rg['rg_idx']]['frag_count'] += 1
 
-    if (reg_idx + 1) % progress_bar == 0:
+    if (reg_idx + 1) % args.progress == 0:
         note(str(reg_idx + 1), 1)
 
 #print [d for d in rg_list[0]['bin_list'][3]['region_list']]
