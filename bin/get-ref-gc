@@ -1,0 +1,127 @@
+#!/usr/bin/env python
+import signal
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+import sys
+import argparse
+import operator
+import gzip
+import math
+import Queue
+import re
+from lib_alu_detect import *
+import lib_alu_detect_sam as sam
+
+n_GC_bins = 100
+
+def clear_queue(q):
+    while not q.empty():
+        q.get_nowait()
+
+
+parser = argparse.ArgumentParser(description=sys.argv[0])
+parser.add_argument('-v', '--verbose', action='append_const', const=1, default=[], dest='verbose')
+parser.add_argument('-p', '--progress', action='store', type=int, default=1000, dest='progress')
+parser.add_argument('-w', '--window-size', action='append', type=int, default=[], dest='win_size')
+parser.add_argument('-c', '--chr-group', action='append', default=[], dest='chr_group')
+parser.add_argument('-g', '--gc5', required=True, action='store', dest='gc5_file')
+args = parser.parse_args()
+set_log_level(len(args.verbose))
+
+i = 0
+while i < len(args.win_size):
+    if args.win_size[i] % 5 != 0:
+        note('window size [' + str(args.win_size[i]) + '] not divisible by 5; ignoring')
+        del args.win_size[i]
+    elif args.win_size[i] == 0:
+        note('window size [' + str(args.win_size[i]) + '] empty; ignoring')
+        del args.win_size[i]
+    else:
+        i += 1
+
+if len(args.win_size) == 0:
+    crash('no window size given')
+
+note('using chr_groups: [' + ','.join(args.chr_group + ['leftover']) + ']', 1)
+note('using win_size: [' + ','.join(map(str, args.win_size)) + ']', 1)
+
+q = [Queue.Queue() for _ in args.win_size]
+gc_cnt = [0 for _ in args.win_size]
+q_pos = [[None, None] for _ in args.win_size]
+crt_chr_group = None
+cnt = [[[0] * n_GC_bins for _ in args.win_size] for _ in xrange(len(args.chr_group) + 1)]
+p = [re.compile('^' + s + '$') for s in args.chr_group]
+
+gc5_file = gzopen(args.gc5_file)
+
+
+for line in gc5_file:
+    line = line.strip().split()
+    if len(line) > 2:
+        # header line, new chromosome
+        crt_chr = line[1].split('=')[1]
+        note('found chr [' + crt_chr + ']', 1)
+
+        # find chr_group
+        m = [int(p[i].match(crt_chr) != None) for i in xrange(len(p))]
+        if sum(m) == 0:
+            note('using leftover chr_group', 1)
+            crt_chr_group = len(args.chr_group)
+        elif sum(m) == 1:
+            crt_chr_group = m.index(1)
+            note('using chr_group [' + args.chr_group[crt_chr_group] + ']', 1)
+        else:
+            crash('chr [' + crt_chr + '] matches more than one chr_group ['
+                  + ','.join([args.chr_group[i] for i in xrange(len(m)) if m[i] != 0])
+                  + ']')
+
+        # clear all queues
+        for i in xrange(len(q)):
+            clear_queue(q[i])
+            gc_cnt[i] = 0
+            q_pos[i] = [None, None]
+
+    else:
+        # new region
+        crt_pos = int(line[0])
+        crt_cnt = int((float(line[1]) * 5) / 100 + .5) # round to nearest
+        for i in xrange(len(q)):
+            # if not contiguous, clear queue before adding it
+            if q_pos[i][1] != None and crt_pos != q_pos[i][1] + 1:
+                #note('skipping to pos [' + str(crt_pos) + ']', 2)
+                clear_queue(q[i])
+                gc_cnt[i] = 0
+                q_pos[i] = [None, None]
+
+            q[i].put_nowait(crt_cnt)
+            gc_cnt[i] += crt_cnt
+            if q_pos[i][0] == None:
+                q_pos[i][0] = crt_pos
+            q_pos[i][1] = crt_pos + 4
+
+            while q_pos[i][1] - q_pos[i][0] + 1 > args.win_size[i]:
+                gc_cnt[i] -= q[i].get_nowait()
+                q_pos[i][0] += 5
+
+            if q_pos[i][1] - q_pos[i][0] + 1 == args.win_size[i]:
+                bin_idx = int((float(gc_cnt[i]) / (args.win_size[i] + 1)) * n_GC_bins)
+                #note('region: [' + str(q_pos[i][0]) + '-' + str(q_pos[i][1]) + '] gc: [' + str(gc_cnt[i]) + '] bin_idx: [' + str(bin_idx) + ']', 2)
+                cnt[crt_chr_group][i][bin_idx] += 1
+
+# done
+
+#note('cnt = ' + str(cnt))
+
+# print by row = gc pct, col = chr_grp
+for i in xrange(len(args.win_size)):
+    for j in xrange(n_GC_bins):
+        #note('i=' + str(i) + ' j=' + str(j))
+        print '\t'.join(
+            map(str,
+                [args.win_size[i],
+                 j,
+                 int(math.ceil((float(j)/n_GC_bins)*(args.win_size[i] + 1)))
+                 ] +
+                map(operator.itemgetter(j), map(operator.itemgetter(i), cnt))
+                )
+            )
