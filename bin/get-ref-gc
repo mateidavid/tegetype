@@ -88,7 +88,7 @@ for line in gc5_file:
         for i in xrange(len(q)):
             # if not contiguous, clear queue before adding it
             if q_pos[i][1] != None and crt_pos != q_pos[i][1] + 1:
-                #note('skipping to pos [' + str(crt_pos) + ']', 2)
+                note('skipping to pos [' + str(crt_pos) + ']', 2)
                 clear_queue(q[i])
                 gc_cnt[i] = 0
                 q_pos[i] = [None, None]
@@ -105,7 +105,7 @@ for line in gc5_file:
 
             if q_pos[i][1] - q_pos[i][0] + 1 == args.win_size[i]:
                 bin_idx = int((float(gc_cnt[i]) / (args.win_size[i] + 1)) * n_GC_bins)
-                #note('region: [' + str(q_pos[i][0]) + '-' + str(q_pos[i][1]) + '] gc: [' + str(gc_cnt[i]) + '] bin_idx: [' + str(bin_idx) + ']', 2)
+                note('region: [' + str(q_pos[i][0]) + '-' + str(q_pos[i][1]) + '] gc: [' + str(gc_cnt[i]) + '] bin_idx: [' + str(bin_idx) + ']', 2)
                 cnt[crt_chr_group][i][bin_idx] += 1
 
 # done
