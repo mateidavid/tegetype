@@ -84,7 +84,8 @@ for line in gc5_file:
     else:
         # new region
         crt_pos = int(line[0])
-        crt_cnt = int((float(line[1]) * 5) / 100 + .5) # round to nearest
+        try: crt_cnt = (int(line[1]) * 5) / 100
+        except ValueError: crt_cnt = int((float(line[1]) * 5) / 100 + .5) # round to nearest
         for i in xrange(len(q)):
             # if not contiguous, clear queue before adding it
             if q_pos[i][1] != None and crt_pos != q_pos[i][1] + 1:
