@@ -19,7 +19,7 @@ private:
   igzstream(const igzstream &) {}
 
   // no copy-assignment operator
-  igzstream & operator = (const igzstream &) {}
+  igzstream & operator = (const igzstream &) { return *this; }
 
 public:
   igzstream() {}
