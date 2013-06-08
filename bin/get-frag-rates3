@@ -98,7 +98,7 @@ for frag_len_idx in xrange(len(mean_frag_unique_list)):
 
 # go through mappings, analyze a sample of them
 frag_gc = [[0] * len(xrange(n_GC_bins)) for _ in rg_list]
-cmd_line2 = 'samtools view ' + mappings_file
+cmd_line2 = 'samtools view ' + args.mappings_file
 p2 = subprocess.Popen(['/bin/bash', '-c', cmd_line2], stdout=subprocess.PIPE)
 for ms in sam.get_mapping_set_gen(p2.stdout):
     for d in ms:
@@ -109,16 +109,20 @@ for ms in sam.get_mapping_set_gen(p2.stdout):
         rg = rg_name_dict[d['RG']]
         rg_idx = rg['rg_idx']
         sam.set_pairing(rg['pairing_string'])
-        if not sam.is_mp_downstream(d['nip'], d['st']):
+        if ((d['paired'] and not sam.is_mp_downstream(d['nip'], d['st']))
+            or (not d['paired'] and d['st'] != 0)):
             continue
 
+        note('sampled: ' + str(d), 2)
         # retrieve ref seq
         cmd_line3 = ('samtools faidx ' + args.ref_fa + ' ' + d['chr'] + ':'
                      + str(d['pos']) + '-' + str(d['pos'] + rg['mean'] - 1)
                      + " | tail -n +2 | tr -d '\n'")
         seq = subprocess.Popen(['/bin/bash', '-c', cmd_line3], stdout=subprocess.PIPE).communicate()[0].upper()
+        note('got seq: ' + seq, 2)
         crt_gc = len([x for x in seq if x in 'GC'])
         bin_idx = int((float(crt_gc) / (rg['mean'] + 1)) * n_GC_bins)
+        note('got bin_idx: ' + str(bin_idx), 2)
         frag_gc[rg_idx][bin_idx] += 1
 
 
@@ -130,8 +134,8 @@ for rg_idx in xrange(len(rg_list)):
             map(str, [','.join(rg['rg_name']),
                       bin_idx,
                       int(math.ceil((float(bin_idx)/n_GC_bins)*(rg['mean'] + 1))),
-                      gc_window_step_len * ref_gc[mean_frag_unique_list.index(rg['mean'])][bin_idx],
-                      int(frag_gc[rg_idx][bin_idx] / args.fraction)
+                      gc_window_step_len * sum(ref_gc[mean_frag_unique_list.index(rg['mean'])][bin_idx]),
+                      int(float(frag_gc[rg_idx][bin_idx]) / args.fraction)
                       ]
                 )
             )
