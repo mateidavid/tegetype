@@ -1,0 +1,137 @@
+#!/usr/bin/env python
+import signal
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+import sys
+import argparse
+import gzip
+import subprocess
+import operator
+import math
+import random
+from lib_alu_detect import *
+import lib_alu_detect_sam as sam
+
+max_Ns = 10
+n_GC_bins = 100
+max_reg_size = 10000
+gc_window_step_len = 5
+
+parser = argparse.ArgumentParser(description=sys.argv[0])
+parser.add_argument('-v', '--verbose', action='append_const', const=1, default=[], dest='verbose')
+parser.add_argument('-s', '--seed', action='store', type=int, dest='seed')
+#parser.add_argument('-n', '--num-regs', action='store', type=int, default=100000, dest='n_regs')
+#parser.add_argument('-p', '--progress', action='store', type=int, default=1000, dest='progress')
+parser.add_argument('-q', '--fraction', action='store', type=float, default=.001, dest='fraction')
+
+parser.add_argument('-f', '--fasta', required=True, action='store', dest='ref_fa')
+#parser.add_argument('-i', '--fasta-index', required=True, action='store', dest='ref_fai')
+parser.add_argument('-l', '--pairing-file', required=True, action='store', dest='pairing_file')
+parser.add_argument('-m', '--mappings', required=True, action='store', dest='mappings_file')
+parser.add_argument('-g', '--ref-gc', required=True, action='store', dest='ref_gc_file')
+args = parser.parse_args()
+set_log_level(len(args.verbose))
+if args.seed:
+    random.seed(args.seed)
+
+
+# read in read group info
+rg_name_dict = dict()
+#rg_id_dict = dict()
+rg_list = list()
+pairing_file_fd = gzopen(args.pairing_file)
+for l in pairing_file_fd:
+    l = l.strip().split('\t')
+    d = dict()
+    d['rg_name'] = l[0].split(',')
+    d['rg_id'] = l[1]
+    d['rg_idx'] = len(rg_list)
+    d['pairing_string'] = l[2]
+    for e in l[2].split(','):
+        e = e.split('=')
+        d[e[0]] = e[1]
+    d['mean'] = int(d['mean'])
+    d['mean'] -= (d['mean'] % gc_window_step_len) # round to gc_window_step_len
+    d['bin_list'] = [{'count': 0, 'frag_count': 0}
+                     for _ in xrange(n_GC_bins)]
+    note('found rg: ' + str(d), 1)
+    for name in d['rg_name']:
+        rg_name_dict[name] = d
+    #rg_id_dict[d['rg_id']] = d
+    rg_list.append(d)
+
+mean_frag_list = [d['mean'] for d in rg_list]
+note('mean_frag_list = ' + str(mean_frag_list), 1)
+mean_frag_unique_list = list(set(mean_frag_list))
+mean_frag_unique_list.sort()
+note('mean_frag_unique_list = ' + str(mean_frag_unique_list), 1)
+
+# retreive reference GC counts for the unique fragment lengths
+ref_gc = [[None for bin_idx in xrange(n_GC_bins)] for _ in mean_frag_unique_list]
+ref_gc_file = gzopen(args.ref_gc_file)
+for line in ref_gc_file:
+    line = line.strip().split('\t')
+    if len(line) != 7:
+        crash('line has incorrect format [' + '\t'.join(line) + ']')
+    frag_len = int(line[0])
+    bin_idx = int(line[1])
+    if bin_idx < 0 or bin_idx >= 100:
+        crash('line has incorrect format [' + '\t'.join(line) + ']')
+    try:
+        frag_len_idx = mean_frag_unique_list.index(frag_len)
+    except ValueError:
+        # file might contain gc counts for other fragment sizes
+        continue
+    ref_gc[frag_len_idx][bin_idx] = map(int, line[3:])
+    note('got frag_len:[' + str(mean_frag_unique_list[frag_len_idx])
+         + '] bin_idx:[' + str(bin_idx) + '] counts:'
+         + str(ref_gc[frag_len_idx][bin_idx]), 1)
+ref_gc_file.close()
+
+# check we got all required counts
+for frag_len_idx in xrange(len(mean_frag_unique_list)):
+    for bin_idx in xrange(n_GC_bins):
+        if ref_gc[frag_len_idx][bin_idx] == None:
+            crash('missing counts for frag_len:[' + str(mean_frag_unique_list[frag_len_idx])
+                  + '] bin_idx:[' + str(bin_idx) + ']')
+
+
+# go through mappings, analyze a sample of them
+frag_gc = [[0] * len(xrange(n_GC_bins)) for _ in rg_list]
+cmd_line2 = 'samtools view ' + mappings_file
+p2 = subprocess.Popen(['/bin/bash', '-c', cmd_line2], stdout=subprocess.PIPE)
+for ms in sam.get_mapping_set_gen(p2.stdout):
+    for d in ms:
+        if random.random() > args.fraction:
+            continue
+        if not d['mapped']:
+            continue
+        rg = rg_name_dict[d['RG']]
+        rg_idx = rg['rg_idx']
+        sam.set_pairing(rg['pairing_string'])
+        if not sam.is_mp_downstream(d['nip'], d['st']):
+            continue
+
+        # retrieve ref seq
+        cmd_line3 = ('samtools faidx ' + args.ref_fa + ' ' + d['chr'] + ':'
+                     + str(d['pos']) + '-' + str(d['pos'] + rg['mean'] - 1)
+                     + " | tail -n +2 | tr -d '\n'")
+        seq = subprocess.Popen(['/bin/bash', '-c', cmd_line3], stdout=subprocess.PIPE).communicate()[0].upper()
+        crt_gc = len([x for x in seq if x in 'GC'])
+        bin_idx = int((float(crt_gc) / (rg['mean'] + 1)) * n_GC_bins)
+        frag_gc[rg_idx][bin_idx] += 1
+
+
+for rg_idx in xrange(len(rg_list)):
+    rg = rg_list[rg_idx]
+    #note('rg = ' + str(rg), 1)
+    for bin_idx in xrange(n_GC_bins):
+        print '\t'.join(
+            map(str, [','.join(rg['rg_name']),
+                      bin_idx,
+                      int(math.ceil((float(bin_idx)/n_GC_bins)*(rg['mean'] + 1))),
+                      gc_window_step_len * ref_gc[mean_frag_unique_list.index(rg['mean'])][bin_idx],
+                      int(frag_gc[rg_idx][bin_idx] / args.fraction)
+                      ]
+                )
+            )
