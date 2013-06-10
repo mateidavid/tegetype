@@ -25,6 +25,7 @@ public:
   igzstream() {}
 
   igzstream(const char * name) { open(name); }
+  igzstream(const std::string& name) { open(name.c_str()); }
 
   igzstream(std::istream & is) { attach(is); }
 
