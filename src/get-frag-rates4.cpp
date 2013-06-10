@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <random>
 
 #include "globals.hpp"
@@ -37,12 +38,20 @@ int getTag(const BamAlignment & m) {
   return res;
 }
 
+string getCigar(const BamAlignment & m) {
+  ostringstream res;
+  for_each(m.CigarData.begin(), m.CigarData.end(), [&] (const CigarOp & op) {
+      res << op.Length << op.Type;
+    });
+  return res.str();
+}
+
 
 void
 process_file(BamReader & bam_file, SamHeader & bam_header, RefVector & bam_seq)
 {
   uniform_real_distribution<double> U(0.0, 1.0);
-  default_random_engine R;
+  default_random_engine R(global::seed >= 0 ? global::seed : time(NULL));
 
   BamAlignment m;
   while (bam_file.GetNextAlignmentCore(m)) {
@@ -51,9 +60,16 @@ process_file(BamReader & bam_file, SamHeader & bam_header, RefVector & bam_seq)
 
     if (global::verbosity > 1) {
       clog << m.Name << "\t"
-	   << getTag(m) << "\t";
+	   << getTag(m) << "\t"
+	   << bam_seq[m.RefID].RefName << "\t"
+	   << m.Position + 1 << "\t"
+	   << m.MapQuality << "\t"
+	   << getCigar(m) << "\t"
+	   << (m.MateRefID == m.RefID? string("=") : 
+	       (m.MateRefID < 0? string("*") : bam_seq[m.MateRefID].RefName)) << "\t"
+	   << m.MatePosition + 1 << "\t"
+	   << m.InsertSize << "\n";
     }
-	
 
     string rg_string;
     m.GetTag(string("RG"), rg_string);
@@ -106,6 +122,9 @@ main(int argc, char * argv[])
       break;
     case 'N':
       global::num_threads = atoi(optarg);
+      break;
+    case 's':
+      global::seed = atoi(optarg);
       break;
     case 'p':
       global::progress = atoi(optarg);
