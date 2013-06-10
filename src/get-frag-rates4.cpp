@@ -164,7 +164,7 @@ main(int argc, char * argv[])
   }
 
   BamReader bam_file;
-  if (not bam_file.Open(argv[1])) {
+  if (not bam_file.Open(mapping_filename)) {
     cerr << "error opening mapping file: " << bam_file.GetErrorString() << "\n";
     exit(EXIT_FAILURE);
   }
