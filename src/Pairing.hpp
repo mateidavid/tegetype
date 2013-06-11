@@ -21,7 +21,6 @@ public:
   int mean;
   int stddev;
   int r_len[2];
-  int idx;
 
   Pairing() { paired = false; }
   Pairing(const string&);
@@ -36,7 +35,17 @@ public:
   bool pair_concordant(const Mapping&, int, const Mapping&, int) const;
 };
 
-typedef map<string,Pairing> RGDict;
+class ReadGroup : public Pairing {
+public:
+  vector<string> rg_name;
+  string rg_num_id;
+  int idx;
+
+  ReadGroup(const string &);
+};
+
+
+typedef map<string,ReadGroup> RGDict;
 typedef map<string,string> RGRGDict;
 
 ostream& operator <<(ostream&, const Pairing&);
