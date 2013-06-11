@@ -222,7 +222,7 @@ load_pairing(istream& istr, RGDict& rg_dict, RGDict& num_rg_dict, RGRGDict& rg_t
     if (itr == token_list.end()) { cerr << "cannot parse pairing line: " << s << endl; exit(1); }
     string tmp(itr->first, itr->second);
     Pairing p(tmp);
-    p.idx = rg_dict().size();
+    p.idx = rg_dict.size();
     rg_dict.insert(pair<string,Pairing>(rg_name, p));
     num_rg_dict.insert(pair<string,Pairing>(num_rg, p));
     rg_to_num_rg_dict.insert(pair<string,string>(rg_name, num_rg));
