@@ -59,7 +59,14 @@ int
 Pairing::get_mp_st(const Mapping& mapping, int r_st) const
 {
   int st = (r_st + mapping.st) % 2;
-  return (st + st_diff) % 2;  
+  return (st + st_diff) % 2;
+}
+
+int
+Pairing::get_mp_st(int read_st, int mapping_st) const
+{
+  int st = (read_st + mapping_st) % 2;
+  return (st + st_diff) % 2;
 }
 
 bool
@@ -72,6 +79,22 @@ Pairing::is_mp_downstream(const Mapping& mapping, int r_st) const
   int sign_5p_diff;
 
   if (nip == 0) {
+    sign_5p_diff = (st == 0? 1 : -1);
+  } else {
+    sign_5p_diff = (mp_st == 0? -1 : 1);
+  }
+
+  return mean * sign_5p_diff > 0;
+}
+
+bool
+Pairing::is_mp_downstream(int read_nip, int read_st, int mapping_st) const
+{
+  int st = (read_st + mapping_st) % 2;
+  int mp_st = get_mp_st(read_st, mapping_st);
+  int sign_5p_diff;
+
+  if (read_nip == 0) {
     sign_5p_diff = (st == 0? 1 : -1);
   } else {
     sign_5p_diff = (mp_st == 0? -1 : 1);
@@ -198,8 +221,10 @@ load_pairing(istream& istr, RGDict& rg_dict, RGDict& num_rg_dict, RGRGDict& rg_t
 
     if (itr == token_list.end()) { cerr << "cannot parse pairing line: " << s << endl; exit(1); }
     string tmp(itr->first, itr->second);
-    rg_dict.insert(pair<string,Pairing>(rg_name, Pairing(tmp)));
-    num_rg_dict.insert(pair<string,Pairing>(num_rg, Pairing(tmp)));
+    Pairing p(tmp);
+    p.idx = rg_dict().size();
+    rg_dict.insert(pair<string,Pairing>(rg_name, p));
+    num_rg_dict.insert(pair<string,Pairing>(num_rg, p));
     rg_to_num_rg_dict.insert(pair<string,string>(rg_name, num_rg));
     if (global::verbosity > 0) clog << "added RG [" << rg_name << "] with pairing [" << rg_dict[rg_name] << "]" << endl;
   }
