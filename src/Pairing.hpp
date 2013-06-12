@@ -37,10 +37,11 @@ public:
 
 class ReadGroup : public Pairing {
 public:
-  vector<string> rg_name;
-  string rg_num_id;
+  vector<string> name;
+  string num_id;
   int idx;
 
+  ReadGroup() {}
   ReadGroup(const string &);
 };
 

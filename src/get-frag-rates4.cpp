@@ -8,13 +8,14 @@
 #include "Fasta.hpp"
 #include "api/BamReader.h"
 #include "igzstream.hpp"
+#include "strtk/strtk.hpp"
 
 using namespace std;
 using namespace BamTools;
 
 
 namespace global {
-  int progress;
+  int progress = 1000;
   int n_gc_bins = 100;
   int gc_window_step_len = 5;
   int max_ns = 10;
@@ -73,10 +74,12 @@ process_file(BamReader & bam_file, const SamHeader & bam_header, const RefVector
   vector<vector<int>> frag_gc(global::rg_dict.size(),
 			      vector<int>(global::n_gc_bins, 0));
 
+  int n_samples = 0;
   BamAlignment m;
   while (bam_file.GetNextAlignmentCore(m)) {
     if (U(R) > global::fraction) continue;
     if (not m.IsMapped()) continue;
+    if (global::bam_to_fa_dict[m.RefID] == global::refDict.end()) continue;
     m.BuildCharData();
 
     string rg_string;
@@ -89,28 +92,50 @@ process_file(BamReader & bam_file, const SamHeader & bam_header, const RefVector
       cerr << "unknown RG: " << getMapping(m, bam_seq) << "\n";
       continue;
     }
-    Pairing& p = global::rg_dict[rg_string];
-    if ((m.IsPaired() and not p.is_mp_downstream(m.IsFirstMate()? 0 : 1,
-						 0,
-						 m.IsReverseStrand()? 1 : 0))
+    ReadGroup& rg = global::rg_dict[rg_string];
+    if ((m.IsPaired() and not rg.is_mp_downstream(m.IsFirstMate()? 0 : 1,
+						  0,
+						  m.IsReverseStrand()? 1 : 0))
 	or (not m.IsPaired() and m.IsReverseStrand()))
       continue;
 					     
-    if (global::verbosity > 1) clog << getMapping(m, bam_seq) << "\n";
+    if (global::verbosity > 1) clog << "sampled: " << getMapping(m, bam_seq);
 
     // compute gc content at mapped location
     int crt_gc = 0;
-    int crt_n = 0;
-    for_each(global::bam_to_fa_dict[m.RefID].second.seq[0].begin() + m.Position,
-	     global::bam_to_fa_dict[m.RefID].second.seq[0].begin() + m.Position + p.mean,
+    int crt_ns = 0;
+    for_each(global::bam_to_fa_dict[m.RefID]->second.seq[0].begin() + m.Position,
+	     global::bam_to_fa_dict[m.RefID]->second.seq[0].begin() + m.Position + rg.mean,
 	     [&] (char c) {
-	       if (c == 'N') crt_n++;
-	       else if (c == 'G' or c == 'C') crt_gc++;
+	       if (c == 'N' or c == 'n') crt_ns++;
+	       else if (c == 'G' or c == 'C' or c == 'g' or c == 'c') crt_gc++;
 	     });
-    if (crt_n > global::max_ns) continue;
-    int bin_idx = int((double(crt_gc) / (p.mean + 1)) * global::n_gc_bins);
-    frag_gc[p.idx][bin_idx]++;
+    if (crt_ns > global::max_ns) {
+      if (global::verbosity > 1) clog << ": too many Ns [" << crt_ns << "]\n";
+      continue;
+    }
+    int bin_idx = int((double(crt_gc) / (rg.mean + 1)) * global::n_gc_bins);
+    if (global::verbosity > 1) clog << ": bin_idx:[" << bin_idx
+				    << "] crt_gc:[" << crt_gc << "]\n";
+    if (bin_idx < 10) {
+      clog << getMapping(m, bam_seq) << "\n";
+      clog << global::bam_to_fa_dict[m.RefID]->second.seq[0].substr(m.Position, rg.mean) << "\n"
+	   << "bin_idx:[" << bin_idx << "] crt_gc:[" << crt_gc << "]\n";
+    }
+    frag_gc[rg.idx][bin_idx]++;
+    n_samples++;
+    if (n_samples % global::progress == 0) clog << n_samples << "\n";
   }
+
+  for_each(global::num_rg_dict.begin(), global::num_rg_dict.end(), [&] (RGDict::value_type & e) {
+      for (int j = 0; j < global::n_gc_bins; ++j) {
+	cout << strtk::join(",", e.second.name) << "\t"
+	     << e.second.mean << "\t"
+	     << j << "\t"
+	     << int(ceil((double(j) / global::n_gc_bins) * (e.second.mean + 1))) << "\t"
+	     << int(double(frag_gc[e.second.idx][j]) / global::fraction) << "\n";
+      }
+    });
 }
 
 
@@ -206,8 +231,8 @@ main(int argc, char * argv[])
       exit(EXIT_FAILURE);
     }
     load_pairing(pairing_is, global::rg_dict, global::num_rg_dict, global::rg_to_num_rg_dict);
-    for_each(rg_dict.begin(), rg_dict.end(), [&] (RGDict::value_type & e) {
-	e.second.mean -= (e.second.mean % gc_window_step_len);
+    for_each(global::rg_dict.begin(), global::rg_dict.end(), [&] (RGDict::value_type & e) {
+	e.second.mean -= (e.second.mean % global::gc_window_step_len);
       });
   }
 

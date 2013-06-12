@@ -190,46 +190,56 @@ load_pairing(istream& istr, RGDict& rg_dict, RGDict& num_rg_dict, RGRGDict& rg_t
 {
   string s;
   while (getline(istr, s)) {
-    strtk::std_string::token_list_type token_list;
-    strtk::split("\t", s, back_inserter(token_list));
-    strtk::std_string::token_list_type::iterator itr = token_list.begin();
+    ReadGroup rg(s);
+    for_each(rg.name.begin(), rg.name.end(), [&] (const string & name) {
+	if (rg_dict.count(name) != 0) {
+	  cerr << "error: duplicate read group: " << name << endl;
+	  exit(1);
+	}
+      });
 
-    if (itr == token_list.end()) { cerr << "cannot parse pairing line: " << s << endl; exit(1); }
-    string rg_name(itr->first, itr->second);
-    if (rg_dict.count(rg_name) != 0) {
-      cerr << "error: duplicate read group: " << rg_name << endl;
-      exit(1);
-    }
-    ++itr;
-
-    if (itr == token_list.end()) { cerr << "cannot parse pairing line: " << s << endl; exit(1); }
-    string num_rg(itr->first, itr->second);
-    if (num_rg_dict.count(num_rg) != 0) {
-      cerr << "error: duplicate numeric read group: " << num_rg << endl;
+    if (num_rg_dict.count(rg.num_id) != 0) {
+      cerr << "error: duplicate numeric read group: " << rg.num_id << endl;
       exit(1);
     }
     if (num_rg_dict.size() > 0) {
-      if ((int)num_rg.size() != global::num_rg_len) {
-	cerr << "error: numeric RG ids of different sizes: " << num_rg.size()
+      if ((int)rg.num_id.size() != global::num_rg_len) {
+	cerr << "error: numeric RG ids of different sizes: " << rg.num_id.size()
 	     << " vs " << global::num_rg_len << endl;
 	exit(1);
       }
     } else {
-      global::num_rg_len = num_rg.size();
+      global::num_rg_len = rg.num_id.size();
     }
-    ++itr;
 
-    if (itr == token_list.end()) { cerr << "cannot parse pairing line: " << s << endl; exit(1); }
-    string tmp(itr->first, itr->second);
-    Pairing p(tmp);
-    p.idx = rg_dict.size();
-    rg_dict.insert(pair<string,Pairing>(rg_name, p));
-    num_rg_dict.insert(pair<string,Pairing>(num_rg, p));
-    rg_to_num_rg_dict.insert(pair<string,string>(rg_name, num_rg));
-    if (global::verbosity > 0) clog << "added RG [" << rg_name << "] with pairing [" << rg_dict[rg_name] << "]" << endl;
+    rg.idx = num_rg_dict.size();
+    for_each(rg.name.begin(), rg.name.end(), [&] (const string & name) {
+	rg_dict.insert(pair<string,ReadGroup>(name, rg));
+	rg_to_num_rg_dict.insert(pair<string,string>(name, rg.num_id));
+      });
+    num_rg_dict.insert(pair<string,ReadGroup>(rg.num_id, rg));
+    if (global::verbosity > 0) clog << "added RG [" << strtk::join(",", rg.name)
+				    << "] with pairing [" << rg << "]\n";
   }
   if (istr.bad()) {
     cerr << "error reading pairing file" << endl;
     exit(1);
   }
+}
+
+ReadGroup::ReadGroup(const string & s)
+{
+  strtk::std_string::token_list_type token_list;
+  strtk::split("\t", s, back_inserter(token_list));
+  if (token_list.size() < 3) {
+    cerr << "cannot parse read group line: " << s << endl;
+    exit(1);
+  }
+  strtk::std_string::token_list_type::iterator itr = token_list.begin();
+  strtk::split(",", string(itr->first, itr->second),
+	       strtk::range_to_type_back_inserter(name));
+  ++itr;
+  num_id = string(itr->first, itr->second);
+  ++itr;
+  (Pairing &)(*this) = Pairing(string(itr->first, itr->second));
 }
