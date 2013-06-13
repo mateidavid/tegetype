@@ -1,5 +1,6 @@
 *.local
 *.o
+*.d
 get-ref-gc
 get-frag-rates
 bamtools
