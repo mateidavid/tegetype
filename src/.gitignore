@@ -1,3 +1,4 @@
+*.local
 *.o
 get-ref-gc
 get-frag-rates
