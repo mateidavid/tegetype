@@ -32,13 +32,14 @@ LDFLAGS += -L bamtools/lib -Wl,--rpath=bamtools/lib
 
 OBJS := get-frag-rates.o globals.o Pairing.o Fasta.o
 DEPS := $(OBJS:.o=.d)
+TGTS := get-frag-rates
 
 .PHONY: all clean
 
-all: get-frag-rates
+all: ${TGTS}
 
 clean:
-	rm -f ${OBJS} ${DEPS}
+	rm -f ${OBJS} ${DEPS} ${TGTS}
 
 -include ${DEPS}
 
