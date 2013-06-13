@@ -1,8 +1,0 @@
-# gcc 4.8.1
-CXX := ${HOME}/opt/gcc-4.8.1/bin/g++
-CXXFLAGS += -I ${HOME}/opt/gcc-4.8.1/include
-LDFLAGS += -L ${HOME}/opt/gcc-4.8.1/lib64 -Wl,--rpath=${HOME}/opt/gcc-4.8.1/lib64
-
-# boost
-CXXFLAGS += -I ${HOME}/opt/include
-LDFLAGS += -L ${HOME}/opt/lib -Wl,--rpath=${HOME}/opt/lib
