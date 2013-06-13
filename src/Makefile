@@ -43,8 +43,9 @@ clean:
 
 -include ${DEPS}
 
-%.d : %.cpp
-	${CXX} ${CPPFLAGS} ${CXXFLAGS} -MM -MP $< >$*.d
+%.o : %.cpp
+	${CXX} ${CXXFLAGS} ${CPPFLAGS} -c $+
+	${CXX} ${CXXFLAGS} ${CPPFLAGS} -MM -MP $< >$*.d
 
 get-frag-rates: get-frag-rates.o globals.o Pairing.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lbamtools -lboost_iostreams
