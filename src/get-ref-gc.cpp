@@ -93,9 +93,6 @@ main(int argc, char* argv[])
   size_t crt_chr_group;
 
   for_each_line(in_file, [&] (const string& line) {
-      int a;
-      int b;
-      double c;
       strtk::ignore_token ignore;
       string s;
       string chr;
@@ -145,6 +142,7 @@ main(int argc, char* argv[])
 	    crt_cnt = int((b * 5) / 100 + 0.5);
 	  } else {
 	    cerr << "error parsing line: [" << line << "]\n";
+	    exit(EXIT_FAILURE);
 	  }
 
 	  if (global::verbosity > 1) clog << "crt_pos=[" << crt_pos << "] crt_cnt=[" << crt_cnt << "]\n";

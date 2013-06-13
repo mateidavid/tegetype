@@ -19,7 +19,7 @@ ifndef CXXFLAGS
   endif
 endif
 
-CXXFLAGS += -std=c++11 -mmmx -msse -msse2 -fopenmp
+CXXFLAGS += -std=c++0x -mmmx -msse -msse2 -fopenmp
 CXXFLAGS += -Wall -Wextra -Wno-unused-local-typedefs
 
 # bamtools
@@ -30,9 +30,9 @@ LDFLAGS += -L bamtools/lib -Wl,--rpath=bamtools/lib
 #override CXXFLAGS+=-DGIT_VERSION=$(GIT_VERSION)
 
 
-OBJS := get-frag-rates.o globals.o Pairing.o Fasta.o
+OBJS := get-frag-rates.o get-ref-gc.o globals.o Pairing.o Fasta.o
 DEPS := $(OBJS:.o=.d)
-TGTS := get-frag-rates
+TGTS := get-frag-rates get-ref-gc
 
 .PHONY: all clean
 
@@ -49,3 +49,5 @@ clean:
 get-frag-rates: get-frag-rates.o globals.o Pairing.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lbamtools -lboost_iostreams
 
+get-ref-gc: get-ref-gc.o
+	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams -lboost_regex
