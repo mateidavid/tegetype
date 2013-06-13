@@ -66,7 +66,7 @@ string getMapping(const BamAlignment & m, const RefVector & bam_seq) {
 
 
 void
-process_file(BamReader & bam_file, const SamHeader & bam_header, const RefVector & bam_seq)
+process_file(BamReader & bam_file, const RefVector & bam_seq)
 {
   uniform_real_distribution<double> U(0.0, 1.0);
   default_random_engine R(global::seed >= 0 ? global::seed : time(NULL));
@@ -256,7 +256,7 @@ main(int argc, char * argv[])
   // for each sq in mappings file, find corresponding sq in fasta file
   get_bam_to_fa_dict(bam_seq);
 
-  process_file(bam_file, bam_header, bam_seq);
+  process_file(bam_file, bam_seq);
   
   return EXIT_SUCCESS;
 }

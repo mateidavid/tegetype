@@ -16,7 +16,7 @@ private:
   std::unique_ptr<std::ifstream> p_file;
 
   // no copy constructor
-  igzstream(const igzstream &) {}
+  igzstream(const igzstream &) : basic_ios<char>(), boost::iostreams::filtering_istream() {}
 
   // no copy-assignment operator
   igzstream & operator = (const igzstream &) { return *this; }
