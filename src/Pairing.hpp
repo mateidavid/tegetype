@@ -35,22 +35,45 @@ public:
   bool pair_concordant(const Mapping&, int, const Mapping&, int) const;
 };
 
-class ReadGroup : public Pairing {
+ostream & operator <<(ostream &, const Pairing &);
+
+
+class ReadGroup {
 public:
   vector<string> name;
   string num_id;
-  int idx;
+  Pairing pairing;
 
   ReadGroup() {}
   ReadGroup(const string &);
+
+  vector<string> get_names() const { return name; }
+  string get_num_id() const { return num_id; }
+  const Pairing * get_pairing() const { return &pairing; }
 };
 
+ostream & operator <<(ostream &, const ReadGroup &);
 
-typedef map<string,ReadGroup> RGDict;
-typedef map<string,string> RGRGDict;
 
-ostream& operator <<(ostream&, const Pairing&);
-void load_pairing(istream&, RGDict&, RGDict&, RGRGDict&);
+class ReadGroupSet {
+public:
+  vector<ReadGroup> rg_list;
+  map<string,int> rg_name_dict;
+  map<string,int> rg_num_id_dict;
+
+  size_t rg_num_id_len;
+
+  ReadGroupSet() : rg_num_id_len(0) {}
+
+  void add(const ReadGroup &);
+  void add(const string & s) { add(ReadGroup(s)); }
+  void load(istream &);
+  ReadGroup * find_by_name(const string &);
+  ReadGroup * find_by_num_id(const string &);
+  ReadGroup * find_by_idx(int i) { return &rg_list[i]; }
+};
+
+ostream & operator <<(ostream &, const ReadGroupSet &);
 
 
 #endif

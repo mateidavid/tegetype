@@ -20,19 +20,21 @@ ifndef CXXFLAGS
 endif
 
 CXXFLAGS += -std=c++0x -mmmx -msse -msse2 -fopenmp
-CXXFLAGS += -Wall -Wextra -Wno-unused-local-typedefs
+CXXFLAGS += -Wall -Wextra
+# -Wno-unused-local-typedefs
 
 # bamtools
-CXXFLAGS += -I bamtools/include
-LDFLAGS += -L bamtools/lib -Wl,--rpath=bamtools/lib
+BAMTOOLS_DIR := $(shell readlink -m bamtools)
+CXXFLAGS += -I ${BAMTOOLS_DIR}/include
+LDFLAGS += -L ${BAMTOOLS_DIR}/lib -Wl,--rpath=${BAMTOOLS_DIR}/lib
 
 #GIT_VERSION=$(shell ./get_git_version)
 #override CXXFLAGS+=-DGIT_VERSION=$(GIT_VERSION)
 
 
-OBJS := get-frag-rates.o get-ref-gc.o globals.o Pairing.o Fasta.o
+OBJS := get-frag-gc.o get-ref-gc.o globals.o Pairing.o Fasta.o
 DEPS := $(OBJS:.o=.d)
-TGTS := get-frag-rates get-ref-gc
+TGTS := get-frag-gc get-ref-gc
 
 .PHONY: all clean
 
@@ -44,9 +46,9 @@ clean:
 -include ${DEPS}
 
 %.o : %.cpp
-	${CXX} ${CXXFLAGS} ${CPPFLAGS} -MMD -MP -o $@ -c $+
+	${CXX} ${CXXFLAGS} ${CPPFLAGS} -MMD -MP -o $@ -c $<
 
-get-frag-rates: get-frag-rates.o globals.o Pairing.o Fasta.o
+get-frag-gc: get-frag-gc.o globals.o Pairing.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lbamtools -lboost_iostreams
 
 get-ref-gc: get-ref-gc.o

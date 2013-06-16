@@ -27,12 +27,8 @@ namespace global {
   EXTERN(SQDict, refDict);
   EXTERN(SQDict, repDict);
 
-  //EXTERN(Pairing, pairing);
-  EXTERN(RGDict, rg_dict);
-  EXTERN(RGDict, num_rg_dict);
-  EXTERN(RGRGDict, rg_to_num_rg_dict);
-  EXTERN_INIT(int, num_rg_len, 0);
-  EXTERN_INIT(string, default_rg, "00");
+  EXTERN(ReadGroupSet, rg_set);
+  EXTERN_INIT(string, default_rg_name, "00");
 
   EXTERN(CONCAT(vector<pair<Contig*,int> >), repeatListAll);
   EXTERN(CONCAT(vector<pair<Contig*,int> >), repeatListSt[2]);

@@ -170,62 +170,22 @@ Pairing::pair_concordant(const Mapping& mapping0, int r0_st,
     mapping1.dbPos[0] >= mp_pos[0][0] and mapping1.dbPos[0] <= mp_pos[1][0];
 }
 
-ostream&
-operator <<(ostream& ostr, const Pairing& pairing)
+
+ostream &
+operator <<(ostream & os, const Pairing& pairing)
 {
   if (!pairing.paired) 
-    ostr << "paired=0";
+    os << "paired=0";
   else
-    ostr << "paired=1"
-	 << ",st_diff=" << pairing.st_diff
-	 << ",min=" << pairing.min
-	 << ",max=" << pairing.max
-	 << ",mean=" << pairing.mean
-	 << ",stddev=" << pairing.stddev;
-  return ostr;
+    os << "paired=1"
+       << ",st_diff=" << pairing.st_diff
+       << ",min=" << pairing.min
+       << ",max=" << pairing.max
+       << ",mean=" << pairing.mean
+       << ",stddev=" << pairing.stddev;
+  return os;
 }
 
-void
-load_pairing(istream& istr, RGDict& rg_dict, RGDict& num_rg_dict, RGRGDict& rg_to_num_rg_dict)
-{
-  string s;
-  while (getline(istr, s)) {
-    ReadGroup rg(s);
-    for_each(rg.name.begin(), rg.name.end(), [&] (const string & name) {
-	if (rg_dict.count(name) != 0) {
-	  cerr << "error: duplicate read group: " << name << endl;
-	  exit(1);
-	}
-      });
-
-    if (num_rg_dict.count(rg.num_id) != 0) {
-      cerr << "error: duplicate numeric read group: " << rg.num_id << endl;
-      exit(1);
-    }
-    if (num_rg_dict.size() > 0) {
-      if ((int)rg.num_id.size() != global::num_rg_len) {
-	cerr << "error: numeric RG ids of different sizes: " << rg.num_id.size()
-	     << " vs " << global::num_rg_len << endl;
-	exit(1);
-      }
-    } else {
-      global::num_rg_len = rg.num_id.size();
-    }
-
-    rg.idx = num_rg_dict.size();
-    for_each(rg.name.begin(), rg.name.end(), [&] (const string & name) {
-	rg_dict.insert(pair<string,ReadGroup>(name, rg));
-	rg_to_num_rg_dict.insert(pair<string,string>(name, rg.num_id));
-      });
-    num_rg_dict.insert(pair<string,ReadGroup>(rg.num_id, rg));
-    if (global::verbosity > 0) clog << "added RG [" << strtk::join(",", rg.name)
-				    << "] with pairing [" << rg << "]\n";
-  }
-  if (istr.bad()) {
-    cerr << "error reading pairing file" << endl;
-    exit(1);
-  }
-}
 
 ReadGroup::ReadGroup(const string & s)
 {
@@ -241,5 +201,86 @@ ReadGroup::ReadGroup(const string & s)
   ++itr;
   num_id = string(itr->first, itr->second);
   ++itr;
-  (Pairing &)(*this) = Pairing(string(itr->first, itr->second));
+  pairing = Pairing(string(itr->first, itr->second));
+}
+
+
+ostream &
+operator <<(ostream & os, const ReadGroup & rg)
+{
+  os << strtk::join(",", rg.get_names()) << "\t"
+     << rg.get_num_id() << "\t"
+     << *rg.get_pairing();
+  return os;
+}
+
+
+void
+ReadGroupSet::add(const ReadGroup & rg)
+{
+  auto names = rg.get_names();
+  for_each(names.begin(), names.end(), [&] (const string & name) {
+      if (rg_name_dict.count(name) > 0) {
+	cerr << "error: duplicate read group name: " << name << "\n";
+	exit(EXIT_FAILURE);
+      }
+    });
+  string num_id = rg.get_num_id();
+  if (rg_num_id_dict.count(num_id) > 0) {
+    cerr << "error:duplicate read group num id: " << num_id << "\n";
+    exit(EXIT_FAILURE);
+  }
+  if (rg_list.size() > 0) {
+    if (num_id.size() != rg_num_id_len) {
+      cerr << "error: rg num ids of different sizes: " << rg_num_id_len
+	   << " vs " << num_id.size() << "\n";
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    rg_num_id_len = num_id.size();
+  }
+
+  int rg_idx = rg_list.size();
+  rg_list.push_back(rg);
+  for_each(names.begin(), names.end(), [&] (const string & name) {
+      rg_name_dict.insert(pair<string,int>(name, rg_idx));
+    });
+  rg_num_id_dict.insert(pair<string,int>(num_id, rg_idx));
+  if (global::verbosity > 0) clog << "added rg [" << rg << "]\n";
+}
+
+void
+ReadGroupSet::load(istream & is)
+{
+  string s;
+  while (getline(is, s))
+    add(s);
+  if (is.bad()) {
+    cerr << "error reading pairing file\n";
+    exit(EXIT_FAILURE);
+  }
+}
+
+ReadGroup *
+ReadGroupSet::find_by_name(const string & s)
+{
+  if (rg_name_dict.count(s) == 0)
+    return NULL;
+  return find_by_idx(rg_name_dict[s]);
+}
+
+ReadGroup *
+ReadGroupSet::find_by_num_id(const string & s) {
+  if (rg_num_id_dict.count(s) == 0)
+    return NULL;
+  return find_by_idx(rg_num_id_dict[s]);
+}
+
+
+ostream &
+operator << (ostream & os, const ReadGroupSet & rgs) {
+  for_each(rgs.rg_list.begin(), rgs.rg_list.end(), [&os] (const ReadGroup & rg) {
+      os << rg << "\n";
+    });
+  return os;
 }

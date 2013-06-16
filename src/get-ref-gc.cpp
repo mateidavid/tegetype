@@ -15,7 +15,7 @@ using strtk::for_each_line;
 namespace global {
   int verbosity;
   int progress;
-  int n_GC_bins = 100;
+  int n_gc_bins = 100;
   int step_len = 5;
 }
 
@@ -84,7 +84,7 @@ main(int argc, char* argv[])
   vector<pair<long long,long long> > q_pos(win_size.size());
   vector<vector<vector<int> > > cnt(chr_group.size() + 1,
 				    vector<vector<int> >(win_size.size(),
-							 vector<int>(global::n_GC_bins, 0)));
+							 vector<int>(global::n_gc_bins, 0)));
   vector<boost::regex> p;
   for_each(chr_group.begin(), chr_group.end(), [&p] (const string& s) {
       p.push_back(boost::regex(s));
@@ -172,7 +172,7 @@ main(int argc, char* argv[])
 
 	    // if full region captured, record gc count
 	    if (q_pos[i].second - q_pos[i].first + 1 == win_size[i]) {
-	      int bin_idx = int((double(gc_cnt[i]) / (win_size[i] + 1)) * global::n_GC_bins);
+	      int bin_idx = int((double(gc_cnt[i]) / (win_size[i] + 1)) * global::n_gc_bins);
 	      cnt[crt_chr_group][i][bin_idx]++;
 	      if (global::verbosity > 1) clog << "region:[" << q_pos[i].first << "," << q_pos[i].second << "] gc:[" << gc_cnt[i] << "] bin_idx:[" << bin_idx << "]\n";
 	    }
@@ -183,12 +183,12 @@ main(int argc, char* argv[])
 
   // print by win_size, then bin number
   for (size_t i = 0; i < win_size.size(); ++i) {
-    for (int j = 0; j < global::n_GC_bins; ++j) {
+    for (int j = 0; j < global::n_gc_bins; ++j) {
       cout << win_size[i] << "\t"
 	   << j << "\t"
-	   << int(ceil((double(j) / global::n_GC_bins) * (win_size[i] + 1)));
+	   << int(ceil((double(j) / global::n_gc_bins) * (win_size[i] + 1)));
       for (size_t k = 0; k <= chr_group.size(); ++k) {
-	  cout << "\t" << cnt[k][i][j];
+	cout << "\t" << cnt[k][i][j] * global::step_len;
       }
       cout << "\n";
     }

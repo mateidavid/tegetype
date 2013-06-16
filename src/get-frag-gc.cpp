@@ -71,7 +71,7 @@ process_file(BamReader & bam_file, const RefVector & bam_seq)
   uniform_real_distribution<double> U(0.0, 1.0);
   default_random_engine R(global::seed >= 0 ? global::seed : time(NULL));
 
-  vector<vector<int>> frag_gc(global::rg_dict.size(),
+  vector<vector<int>> frag_gc(global::rg_set.rg_list.size(),
 			      vector<int>(global::n_gc_bins, 0));
 
   int n_samples = 0;
@@ -88,14 +88,16 @@ process_file(BamReader & bam_file, const RefVector & bam_seq)
       cerr << "missing RG in SAM line: " << getMapping(m, bam_seq) << "\n";
       continue;
     }
-    if (global::rg_dict.find(rg_string) == global::rg_dict.end()) {
+    ReadGroup * rg_p = global::rg_set.find_by_name(rg_string);
+    if (rg_p == NULL) {
       cerr << "unknown RG: " << getMapping(m, bam_seq) << "\n";
       continue;
     }
-    ReadGroup& rg = global::rg_dict[rg_string];
-    if ((m.IsPaired() and not rg.is_mp_downstream(m.IsFirstMate()? 0 : 1,
-						  0,
-						  m.IsReverseStrand()? 1 : 0))
+    size_t rg_idx = rg_p - &global::rg_set.rg_list[0];
+    if ((m.IsPaired()
+	 and not rg_p->get_pairing()->is_mp_downstream(m.IsFirstMate()? 0 : 1,
+						       0,
+						       m.IsReverseStrand()? 1 : 0))
 	or (not m.IsPaired() and m.IsReverseStrand()))
       continue;
 					     
@@ -105,7 +107,7 @@ process_file(BamReader & bam_file, const RefVector & bam_seq)
     int crt_gc = 0;
     int crt_ns = 0;
     for_each(global::bam_to_fa_dict[m.RefID]->second.seq[0].begin() + m.Position,
-	     global::bam_to_fa_dict[m.RefID]->second.seq[0].begin() + m.Position + rg.mean,
+	     global::bam_to_fa_dict[m.RefID]->second.seq[0].begin() + m.Position + rg_p->get_pairing()->mean,
 	     [&] (char c) {
 	       if (c == 'N' or c == 'n') crt_ns++;
 	       else if (c == 'G' or c == 'C' or c == 'g' or c == 'c') crt_gc++;
@@ -114,28 +116,29 @@ process_file(BamReader & bam_file, const RefVector & bam_seq)
       if (global::verbosity > 1) clog << ": too many Ns [" << crt_ns << "]\n";
       continue;
     }
-    int bin_idx = int((double(crt_gc) / (rg.mean + 1)) * global::n_gc_bins);
+    int bin_idx = int((double(crt_gc) / (rg_p->get_pairing()->mean + 1)) * global::n_gc_bins);
     if (global::verbosity > 1) clog << ": bin_idx:[" << bin_idx
 				    << "] crt_gc:[" << crt_gc << "]\n";
     if (bin_idx < 10) {
       clog << getMapping(m, bam_seq) << "\n";
-      clog << global::bam_to_fa_dict[m.RefID]->second.seq[0].substr(m.Position, rg.mean) << "\n"
+      clog << global::bam_to_fa_dict[m.RefID]->second.seq[0].substr(m.Position, rg_p->get_pairing()->mean) << "\n"
 	   << "bin_idx:[" << bin_idx << "] crt_gc:[" << crt_gc << "]\n";
     }
-    frag_gc[rg.idx][bin_idx]++;
+    frag_gc[rg_idx][bin_idx]++;
     n_samples++;
     if (n_samples % global::progress == 0) clog << n_samples << "\n";
   }
 
-  for_each(global::num_rg_dict.begin(), global::num_rg_dict.end(), [&] (RGDict::value_type & e) {
-      for (int j = 0; j < global::n_gc_bins; ++j) {
-	cout << strtk::join(",", e.second.name) << "\t"
-	     << e.second.mean << "\t"
-	     << j << "\t"
-	     << int(ceil((double(j) / global::n_gc_bins) * (e.second.mean + 1))) << "\t"
-	     << int(double(frag_gc[e.second.idx][j]) / global::fraction) << "\n";
-      }
-    });
+  for (size_t rg_idx = 0; rg_idx < global::rg_set.rg_list.size(); ++rg_idx) {
+    auto rg_p = global::rg_set.find_by_idx(rg_idx);
+    for (int j = 0; j < global::n_gc_bins; ++j) {
+      cout << strtk::join(",", rg_p->get_names()) << "\t"
+	   << rg_p->get_pairing()->mean << "\t"
+	   << j << "\t"
+	   << int(ceil((double(j) / global::n_gc_bins) * (rg_p->get_pairing()->mean + 1))) << "\t"
+	   << int(double(frag_gc[rg_idx][j]) / global::fraction) << "\n";
+    }
+  }
 }
 
 
@@ -230,9 +233,9 @@ main(int argc, char * argv[])
       cerr << "error opening pairing file: " << pairing_filename << "\n";
       exit(EXIT_FAILURE);
     }
-    load_pairing(pairing_is, global::rg_dict, global::num_rg_dict, global::rg_to_num_rg_dict);
-    for_each(global::rg_dict.begin(), global::rg_dict.end(), [&] (RGDict::value_type & e) {
-	e.second.mean -= (e.second.mean % global::gc_window_step_len);
+    global::rg_set.load(pairing_is);
+    for_each(global::rg_set.rg_list.begin(), global::rg_set.rg_list.end(), [&] (ReadGroup & rg) {
+	rg.pairing.mean -= (rg.pairing.mean % global::gc_window_step_len);
       });
   }
 
