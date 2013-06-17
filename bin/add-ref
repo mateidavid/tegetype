@@ -11,7 +11,7 @@ usage () {
 cl_ref_fa=
 cl_ref_gc5=
 OPTIND=1
-while getopts "f:" OPT "$@"; do
+while getopts "f:g:" OPT "$@"; do
     case $OPT in
 	f)
 	    cl_ref_fa=$OPTARG
