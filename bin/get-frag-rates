@@ -7,9 +7,27 @@
 source lib.tegetype.sh
 set -eEu -o pipefail
 
+#
+# don't trust the user; check paths
+#
+(cmd_exists python && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) ||
+crash "python2.6+ not found"
+cmd_exists samtools || crash "samtools not found"
+
 usage () {
-    echo "Use: $(basename $0) <ngs_name> <ref_name>"
+    echo "Use: $(basename $0) [ -m <mappings.bam> ] <ngs_name> <ref_name>"
 }
+
+orig_mappings=()
+OPTIND=1
+while getopts "m:" OPT "$@"; do
+    case $OPT in
+	m)
+	    orig_mappings+=("$OPTARG")
+	    ;;
+    esac
+done
+shift $(($OPTIND - 1))
 
 if [ $# -ne 2 ]; then
     usage >&2
@@ -23,21 +41,22 @@ check_files_readable "$ref_fa" "$ref_fai" "$ref_gc5"
 pairing_file=$ngs_name.$ref_name.pairing
 check_files_readable "$pairing_file"
 
-#
-# don't trust the user; check most settings
-#
-(cmd_exists python && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) ||
-crash "python2.6+ not found"
-cmd_exists samtools || crash "samtools not found"
+if [ ${#orig_mappings[@]} -gt 0 ] && [ "${ORIG_MAPPINGS:-}" ]; then
+    crash "mappings can be given using either ORIG_MAPPINGS or -m, but not both"
+elif [ "${ORIG_MAPPINGS:-}" ]; then
+    ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
+    orig_mappings=($(ls $ORIG_MAPPINGS))
+elif [ ${#orig_mappings[@]} -gt 0 ]; then
+    check_files_readable "${orig_mappings[@]}"
+else
+    crash "no mappings given"
+fi
+make_note "using mappings: $(quote "${orig_mappings[@]}" | tr '\n' ' ')"
 
-
-make_note "using mapping file(s): [$ORIG_MAPPINGS]"
-ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
-orig_mappings=($(ls $ORIG_MAPPINGS))
-for f in ${orig_mappings[@]}; do
-    (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM") ||
+for f in "${orig_mappings[@]}"; do
+    (set +o pipefail; zc "$f" | head -n 1 | cut -c -3 | grep -q "BAM") ||
     crash "$f: not a BAM file"
-    (set +o pipefail; samtools view -H $f | head -n 1 | grep -q "coordinate") ||
+    (set +o pipefail; samtools view -H "$f" | head -n 1 | grep -q "coordinate") ||
     crash "$f: not sorted by coordinate"
 done
 
@@ -74,12 +93,18 @@ run_stage
 STAGE_NUM=2
 STAGE_NAME="Compute fragment gc counts"
 frag_gc_csv=$ngs_name.$ref_name.frag-gc.csv
-INPUT_FILES="${orig_mappings[@]} $pairing_file"
+INPUT_FILES="$pairing_file"
 OUTPUT_FILES=$frag_gc_csv
 stage_command () {
-    get-frag-gc -v ${SEED:+-s} ${SEED:-} ${FRACTION:+-q} ${FRACTION:-} \
-	-f "$ref_fa" -l "$pairing_file" -m "${orig_mappings[@]}" \
-	>"$frag_gc_csv"
+    tmp=()
+    i=0
+    while [ $i -lt ${#orig_mappings[@]} ]; do
+	tmp+=("-m" "${orig_mappings[$i]}")
+	let i+=1
+    done
+
+    get-frag-gc -v ${SEED:+-s ${SEED}} ${FRACTION:+-q ${FRACTION}} \
+	-f "$ref_fa" -l "$pairing_file" "${tmp[@]}" >"$frag_gc_csv"
 }
 run_stage
 
