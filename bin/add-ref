@@ -5,7 +5,7 @@ set -eEu -o pipefail
 data_dir=$BASE_DIR/data
 
 usage () {
-    echo "Use: $(basename $0) [ -f <ref.fa> ] <ref_name>"
+    echo "Use: $(basename $0) -f <ref.fa> -g <gc5_file> <ref_name>"
 }
 
 cl_ref_fa=
