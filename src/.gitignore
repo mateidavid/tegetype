@@ -2,5 +2,5 @@
 *.o
 *.d
 get-ref-gc
-get-frag-rates
+get-frag-gc
 bamtools

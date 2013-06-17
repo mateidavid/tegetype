@@ -1,5 +1,3 @@
--include Makefile.local
-
 SHELL := /bin/bash
 LD := ${CXX}
 
@@ -21,12 +19,16 @@ endif
 
 CXXFLAGS += -std=c++0x -mmmx -msse -msse2 -fopenmp
 CXXFLAGS += -Wall -Wextra
-# -Wno-unused-local-typedefs
+-include Makefile.local
+
 
 # bamtools
 BAMTOOLS_DIR := $(shell readlink -m bamtools)
-CXXFLAGS += -I ${BAMTOOLS_DIR}/include
-LDFLAGS += -L ${BAMTOOLS_DIR}/lib -Wl,--rpath=${BAMTOOLS_DIR}/lib
+BAMTOOLS_CFLAGS := -I ${BAMTOOLS_DIR}/include
+BAMTOOLS_LDFLAGS := -L ${BAMTOOLS_DIR}/lib -Wl,--rpath=${BAMTOOLS_DIR}/lib
+CXXFLAGS += ${BAMTOOLS_CFLAGS}
+LDFLAGS += ${BAMTOOLS_LDFLAGS}
+
 
 #GIT_VERSION=$(shell ./get_git_version)
 #override CXXFLAGS+=-DGIT_VERSION=$(GIT_VERSION)
