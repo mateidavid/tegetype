@@ -37,21 +37,23 @@ LDFLAGS += ${BAMTOOLS_LDFLAGS}
 OBJS := get-frag-gc.o get-ref-gc.o globals.o Pairing.o Fasta.o
 DEPS := $(OBJS:.o=.d)
 TGTS := get-frag-gc get-ref-gc
+BIN_PATH := ../bin
+TGTS_W_PATH := $(foreach tgt,${TGTS},${BIN_PATH}/${tgt})
 
 .PHONY: all clean
 
-all: ${TGTS}
+all: ${TGTS_W_PATH}
 
 clean:
-	rm -f ${OBJS} ${DEPS} ${TGTS}
+	rm -f ${OBJS} ${DEPS} ${TGTS_W_PATH}
 
 -include ${DEPS}
 
 %.o : %.cpp
 	${CXX} ${CXXFLAGS} ${CPPFLAGS} -MMD -MP -o $@ -c $<
 
-get-frag-gc: get-frag-gc.o globals.o Pairing.o Fasta.o
+%/get-frag-gc: get-frag-gc.o globals.o Pairing.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lbamtools -lboost_iostreams
 
-get-ref-gc: get-ref-gc.o
+%/get-ref-gc: get-ref-gc.o
 	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams -lboost_regex
