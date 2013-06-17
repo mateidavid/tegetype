@@ -41,6 +41,10 @@ for f in ${orig_mappings[@]}; do
     crash "$f: not sorted by coordinate"
 done
 
+START_STAGE=${START_STAGE:-0}
+END_STAGE=${END_STAGE:-100}
+make_note "using START_STAGE=$START_STAGE and END_STAGE=$END_STAGE"
+
 
 #
 # Stage 1: Compute ref gc counts
