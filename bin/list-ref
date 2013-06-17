@@ -18,7 +18,7 @@ for f in "$data_dir"/ref.*.fa; do
     ref_name=${ref_name##*.}
     set_ref_var_names $ref_name
     have_all=1
-    for g in "$ref_fa" "$ref_fai"; do
+    for g in "$ref_fa" "$ref_fai" "$ref_gc5"; do
 	[ -r "$g" ] || { have_all= ; break; }
     done
     if [ $have_all ]; then

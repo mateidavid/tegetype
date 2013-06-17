@@ -26,6 +26,7 @@ export BASH_XTRACEFD=$BASH_XTRACEFD
 set_ref_var_names () {
     ref_fa=$BASE_DIR/data/ref.$1.fa
     ref_fai=$BASE_DIR/data/ref.$1.fa.fai
+    ref_gc5=$BASE_DIR/data/ref.$1.gc5.txt.gz
 }
 
 set_lib_var_names () {
