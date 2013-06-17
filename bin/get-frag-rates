@@ -1,0 +1,82 @@
+#!/bin/bash
+[ "$BASE_DIR" ] ||
+{
+    echo "run this script through tegetype wrapper" >&2
+    exit 1
+}
+source lib.tegetype.sh
+set -eEu -o pipefail
+
+usage () {
+    echo "Use: $(basename $0) <ngs_name> <ref_name>"
+}
+
+if [ $# -ne 2 ]; then
+    usage >&2
+    exit
+fi
+
+ngs_name=$1
+ref_name=$2
+set_ref_var_names $ref_name
+check_files_readable "$ref_fa" "$ref_fai" "$ref_gc5"
+pairing_file=$ngs_name.$ref_name.pairing
+check_files_readable "$pairing_file"
+
+#
+# don't trust the user; check most settings
+#
+(cmd_exists python && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) ||
+crash "python2.6+ not found"
+cmd_exists samtools || crash "samtools not found"
+
+
+make_note "using mapping file(s): [$ORIG_MAPPINGS]"
+ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
+orig_mappings=($(ls $ORIG_MAPPINGS))
+for f in ${orig_mappings[@]}; do
+    (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM") ||
+    crash "$f: not a BAM file"
+    (set +o pipefail; samtools view -H $f | head -n 1 | grep -q "coordinate") ||
+    crash "$f: not sorted by coordinate"
+done
+
+
+#
+# Stage 1: Compute ref gc counts
+#
+STAGE_NUM=1
+STAGE_NAME="Compute ref gc counts"
+ref_gc_csv=$ngs_name.$ref_name.ref-gc.csv
+INPUT_FILES=$pairing_file
+OUTPUT_FILES=$ref_gc_csv
+stage_command () {
+    get-ref-gc -v -c 'chr[0-9]+' -c chrX -c chrY $(
+	grep -o 'mean=[0-9]*' "$pairing_file" |
+	cut -c 6- |
+	awk '{print $1 - ($1 % 5)}' |
+	sort -n |
+	uniq |
+	sed 's/^/-w /' |
+	tr '\n' ' '
+    ) "$ref_gc5" >"$ref_gc_csv"
+}
+run_stage
+
+
+#
+# Stage 2: Compute fragment gc counts
+#
+STAGE_NUM=2
+STAGE_NAME="Compute fragment gc counts"
+frag_gc_csv=$ngs_name.$ref_name.frag-gc.csv
+INPUT_FILES="${orig_mappings[@]} $pairing_file"
+OUTPUT_FILES=$frag_gc_csv
+stage_command () {
+    get-frag-gc -v ${SEED:+-s} ${SEED:-} ${FRACTION:+-q} ${FRACTION:-} \
+	-f "$ref_fa" -l "$pairing_file" -m "${orig_mappings[@]}" \
+	>"$frag_gc_csv"
+}
+run_stage
+
+
