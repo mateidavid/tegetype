@@ -22,6 +22,12 @@ namespace global {
   long long seed = -1;
   double fraction = .001;
   vector<SQDict::iterator> bam_to_fa_dict;
+
+  uniform_real_distribution<double> U(0.0, 1.0);
+  default_random_engine R;
+
+  vector<vector<int>> frag_gc(global::rg_set.rg_list.size(),
+			      vector<int>(global::n_gc_bins, 0));
 }
 
 
@@ -68,16 +74,10 @@ string getMapping(const BamAlignment & m, const RefVector & bam_seq) {
 void
 process_file(BamReader & bam_file, const RefVector & bam_seq)
 {
-  uniform_real_distribution<double> U(0.0, 1.0);
-  default_random_engine R(global::seed >= 0 ? global::seed : time(NULL));
-
-  vector<vector<int>> frag_gc(global::rg_set.rg_list.size(),
-			      vector<int>(global::n_gc_bins, 0));
-
   int n_samples = 0;
   BamAlignment m;
   while (bam_file.GetNextAlignmentCore(m)) {
-    if (U(R) > global::fraction) continue;
+    if (global::U(global::R) > global::fraction) continue;
     if (not m.IsMapped()) continue;
     if (global::bam_to_fa_dict[m.RefID] == global::refDict.end()) continue;
     m.BuildCharData();
@@ -124,11 +124,15 @@ process_file(BamReader & bam_file, const RefVector & bam_seq)
       clog << global::bam_to_fa_dict[m.RefID]->second.seq[0].substr(m.Position, rg_p->get_pairing()->mean) << "\n"
 	   << "bin_idx:[" << bin_idx << "] crt_gc:[" << crt_gc << "]\n";
     }
-    frag_gc[rg_idx][bin_idx]++;
+    global::frag_gc[rg_idx][bin_idx]++;
     n_samples++;
     if (n_samples % global::progress == 0) clog << n_samples << "\n";
   }
+}
 
+void
+print_output()
+{
   for (size_t rg_idx = 0; rg_idx < global::rg_set.rg_list.size(); ++rg_idx) {
     auto rg_p = global::rg_set.find_by_idx(rg_idx);
     for (int j = 0; j < global::n_gc_bins; ++j) {
@@ -136,7 +140,7 @@ process_file(BamReader & bam_file, const RefVector & bam_seq)
 	   << rg_p->get_pairing()->mean << "\t"
 	   << j << "\t"
 	   << int(ceil((double(j) / global::n_gc_bins) * (rg_p->get_pairing()->mean + 1))) << "\t"
-	   << int(double(frag_gc[rg_idx][j]) / global::fraction) << "\n";
+	   << int(double(global::frag_gc[rg_idx][j]) / global::fraction) << "\n";
     }
   }
 }
@@ -145,6 +149,8 @@ process_file(BamReader & bam_file, const RefVector & bam_seq)
 void
 get_bam_to_fa_dict(RefVector & bam_seq)
 {
+  global::bam_to_fa_dict.clear();
+
   for (size_t i = 0; i < bam_seq.size(); ++i) {
     auto it_first = global::refDict.end();
     auto it_last = global::refDict.end();
@@ -175,7 +181,7 @@ main(int argc, char * argv[])
   string prog_name(argv[0]);
   string fasta_filename;
   string pairing_filename;
-  string mapping_filename;
+  vector<string> mapping_filename;
 
   char c;
     while ((c = getopt(argc, argv, "vN:s:p:q:f:l:m:")) != -1) {
@@ -202,7 +208,7 @@ main(int argc, char * argv[])
       pairing_filename = optarg;
       break;
     case 'm':
-      mapping_filename = optarg;
+      mapping_filename.push_back(string(optarg));
       break;
     default:
       cerr << "unrecognized option: " << c << "\n";
@@ -223,10 +229,20 @@ main(int argc, char * argv[])
     exit(EXIT_FAILURE);
   }
   if (mapping_filename.size() == 0) {
-    cerr << "mapping file not given\n";
+    cerr << "mapping file(s) not given\n";
     exit(EXIT_FAILURE);
   }
 
+  // init random engine
+  if (global::seed < 0) global::seed = time(NULL);
+  global::R = default_random_engine(global::seed);
+
+  if (global::verbosity > 0) {
+    clog << "using seed [" << global::seed << "]\n";
+    clog << "using fraction [" << global::fraction << "]\n";
+  }
+
+  // load pairing file
   {
     igzstream pairing_is(pairing_filename);
     if (!pairing_is) {
@@ -239,6 +255,7 @@ main(int argc, char * argv[])
       });
   }
 
+  // load reference
   {
     igzstream fasta_is(fasta_filename);
     if (!fasta_is) {
@@ -248,18 +265,30 @@ main(int argc, char * argv[])
     readFasta(fasta_is, global::refDict);
   }
 
-  BamReader bam_file;
-  if (not bam_file.Open(mapping_filename)) {
-    cerr << "error opening mapping file: " << bam_file.GetErrorString() << "\n";
-    exit(EXIT_FAILURE);
-  }
-  SamHeader bam_header = bam_file.GetHeader();
-  RefVector bam_seq = bam_file.GetReferenceData();
+  // init global counters
+  global::frag_gc = vector<vector<int>>(global::rg_set.rg_list.size(),
+					vector<int>(global::n_gc_bins, 0));
 
-  // for each sq in mappings file, find corresponding sq in fasta file
-  get_bam_to_fa_dict(bam_seq);
+  // process mapping files sequentially
+  for_each(mapping_filename.begin(), mapping_filename.end(), [&] (const string & fn) {
+      BamReader bam_file;
+      if (not bam_file.Open(fn)) {
+	cerr << "error opening mapping file: " << bam_file.GetErrorString() << "\n";
+	exit(EXIT_FAILURE);
+      } else if (global::verbosity > 0) {
+	clog << "processing file: " << fn << "\n";
+      }
+      //SamHeader bam_header = bam_file.GetHeader();
+      RefVector bam_seq = bam_file.GetReferenceData();
 
-  process_file(bam_file, bam_seq);
-  
+      // for each sq in mappings file, find corresponding sq in fasta file
+      get_bam_to_fa_dict(bam_seq);
+
+      process_file(bam_file, bam_seq);
+    });
+
+  // output
+  print_output();
+
   return EXIT_SUCCESS;
 }
