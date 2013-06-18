@@ -76,8 +76,8 @@ make_note "using START_STAGE=$START_STAGE and END_STAGE=$END_STAGE"
 STAGE_NUM=1
 STAGE_NAME="Compute ref gc counts"
 ref_gc_csv=$ngs_name.$ref_name.ref-gc.csv
-INPUT_FILES=$pairing_file
-OUTPUT_FILES=$ref_gc_csv
+input_files=("$pairing_file")
+output_files=("$ref_gc_csv")
 stage_command () {
     get-ref-gc -v -c 'chr[0-9]+' -c chrX -c chrY $(
 	grep -o 'mean=[0-9]*' "$pairing_file" |
@@ -98,8 +98,8 @@ run_stage
 STAGE_NUM=2
 STAGE_NAME="Compute fragment gc counts"
 frag_gc_csv=$ngs_name.$ref_name.frag-gc.csv
-INPUT_FILES="$pairing_file"
-OUTPUT_FILES=$frag_gc_csv
+input_files=("${orig_mappings[@]}" "$pairing_file")
+output_files=("$frag_gc_csv")
 stage_command () {
     tmp=()
     i=0
@@ -115,13 +115,13 @@ run_stage
 
 
 #
-# Stage 3: Compute fragment rates
+# Stage 3: Compute raw fragment rates
 #
 STAGE_NUM=3
-STAGE_NAME="Compute fragment rates"
+STAGE_NAME="Compute raw fragment rates"
 frag_rate_raw_csv=$ngs_name.$ref_name.frag-rate.raw.csv
-INPUT_FILES="$ref_gc_csv $frag_gc_csv"
-OUTPUT_FILES=$frag_rate_raw_csv
+input_files=("$ref_gc_csv" "$frag_gc_csv")
+output_files=("$frag_rate_raw_csv")
 stage_command () {
     if [ $gender = m ]; then
 	count_x=1
@@ -141,5 +141,20 @@ stage_command () {
     tr ':' '\t' |
     tawk '{print $3, $2, $4, $5}' |
     sort -k 1,1 -k 2,2n >"$frag_rate_raw_csv"
+}
+run_stage
+
+
+#
+# Stage 4: Compute smoothed fragment rates
+#
+STAGE_NUM=4
+STAGE_NAME="Compute smoothed fragment rates"
+frag_rate_fit_csv=$ngs_name.$ref_name.frag-rate.fit.csv
+unset input_files
+unset output_files
+#OUTPUT_FILES=$frag_rate_raw_csv
+stage_command () {
+    echo "Hi"
 }
 run_stage
