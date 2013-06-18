@@ -15,15 +15,22 @@ crash "python2.6+ not found"
 cmd_exists samtools || crash "samtools not found"
 
 usage () {
-    echo "Use: $(basename $0) [ -m <mappings.bam> ] <ngs_name> <ref_name>"
+    echo "Use: $(basename $0) [ -g <gender> ] [ -m <mappings.bam> ] <ngs_name> <ref_name>"
 }
 
 orig_mappings=()
+gender=m
 OPTIND=1
 while getopts "m:" OPT "$@"; do
     case $OPT in
 	m)
 	    orig_mappings+=("$OPTARG")
+	    ;;
+	g)
+	    if [ ! "$OPTARG" = "m" ] && [ ! "$OPTARG" = "f" ]; then
+		crash "unrecognized gender: [$OPTARG]"
+	    fi
+	    gender=$OPTARG
 	    ;;
     esac
 done
@@ -109,3 +116,31 @@ stage_command () {
 run_stage
 
 
+#
+# Stage 3: Compute fragment rates
+#
+STAGE_NUM=3
+STAGE_NAME="Compute fragment rates"
+frag_rate_raw_csv=$ngs_name.$ref_name.frag-rate.raw.csv
+INPUT_FILES="$ref_gc_csv $frag_gc_csv"
+OUTPUT_FILES=$frag_rate_raw_csv
+stage_command () {
+    if [ $gender = m ]; then
+	count_x=1
+	count_y=1
+    else
+	count_x=2
+	count_y=0
+    fi
+    join -t "	" -1 1 <(
+	<"$frag_gc_csv" tawk '{print $2 ":" $3, $1, $5}' |
+	sort -k 1,1
+    ) -2 1 <(
+	<"$ref_gc_csv" tawk -v count_x=$count_x -v count_y=$count_y \
+	    '{print $1 ":" $2, 2*($4 + $7) + count_x*$5 + count_y*$6}' |
+	sort -k 1,1
+    ) |
+    tr ':' '\t' |
+    tawk '{print $3, $2, $4, $5}' |
+    sort -k 1,1 -k 2,2n >"$frag_rate_raw_csv"
+}
