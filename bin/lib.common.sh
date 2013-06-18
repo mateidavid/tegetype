@@ -138,12 +138,30 @@ run_stage () {
 	exit
     fi
 
-    for f in $INPUT_FILES; do
-	[ -r $f ] || crash "$f missing"
+    local _input_files=()
+    if [ "${#input_files[@]}" -gt 0 ]; then
+	_input_files=("${input_files[@]}")
+    elif [ "$input_files_ql" ]; then
+	eval "_input_files=($(echo $input_files_ql))"
+    elif [ "$INPUT_FILES" ]; then
+	_input_files=($INPUT_FILES)
+    fi
+
+    local _output_files=()
+    if [ "${#output_files[@]}" -gt 0 ]; then
+	_output_files=("${output_files[@]}")
+    elif [ "$output_files_ql" ]; then
+	eval "_output_files=($(echo $output_files_ql))"
+    elif [ "$OUTPUT_FILES" ]; then
+	_output_files=($OUTPUT_FILES)
+    fi
+
+    for f in "${_input_files[@]}"; do
+	[ -r "$f" ] || crash "$f missing"
     done
 
     local need_to_run=
-    for f in $OUTPUT_FILES; do
+    for f in "${_output_files[@]}"; do
 	if [ ! -r "$f" ] ; then
 	    make_note "$f does not exist"
 	    need_to_run=1
@@ -151,8 +169,8 @@ run_stage () {
 	fi
     done
     if [ ! $need_to_run ]; then
-	for f in $OUTPUT_FILES; do
-	    for g in $INPUT_FILES; do
+	for f in "${_output_files[@]}"; do
+	    for g in "${_input_files[@]}"; do
 		if [ "$g" -nt "$f" ]; then
 		    make_note "$g is newer than $f"
 		    need_to_run=1
@@ -163,13 +181,13 @@ run_stage () {
 	done
     fi
     if [ ! $need_to_run ]; then
-	make_note "$OUTPUT_FILES up to date"
+	make_note "files up to date: $(quote "${_output_files[@]}")"
     else
 	make_note "need to run"
 	typeset -f stage_command >&2
 	if ask_confirmation ; then
 	    make_note "starting"
-	    force_errexit stage_command || { rm -f $OUTPUT_FILES ; crash "failed" ; }
+	    force_errexit stage_command || { rm -f "${_output_files[@]}"; crash "failed"; }
 	    make_note "done"
 	else
 	    make_note "skipping"
