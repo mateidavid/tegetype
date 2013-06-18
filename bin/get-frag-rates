@@ -23,7 +23,7 @@ if [ "${ORIG_MAPPINGS:-}" ]; then
     ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "$ORIG_MAPPINGS: could not find mappings"
     orig_mappings=($(ls $ORIG_MAPPINGS))
 fi
-gender=${GENDER:-}
+gender=${GENDER:-m}
 OPTIND=1
 while getopts "m:" OPT "$@"; do
     case $OPT in
@@ -63,6 +63,8 @@ for f in "${orig_mappings[@]}"; do
     (set +o pipefail; samtools view -H "$f" | head -n 1 | grep -q "coordinate") ||
     crash "$f: not sorted by coordinate"
 done
+
+make_note "gender: $gender"
 
 
 START_STAGE=${START_STAGE:-0}
