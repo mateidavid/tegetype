@@ -144,3 +144,4 @@ stage_command () {
     tawk '{print $3, $2, $4, $5}' |
     sort -k 1,1 -k 2,2n >"$frag_rate_raw_csv"
 }
+run_stage
