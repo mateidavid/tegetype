@@ -139,40 +139,44 @@ run_stage () {
     fi
 
     local _input_files=()
-    if [ "${#input_files[@]}" -gt 0 ]; then
+    if [ "${input_files[*]:-}" ]; then
 	_input_files=("${input_files[@]}")
-    elif [ "$input_files_ql" ]; then
+    elif [ "${input_files_ql:-}" ]; then
 	eval "_input_files=($(echo $input_files_ql))"
-    elif [ "$INPUT_FILES" ]; then
-	_input_files=($INPUT_FILES)
+    else
+	_input_files=(${INPUT_FILES:-})
     fi
 
     local _output_files=()
-    if [ "${#output_files[@]}" -gt 0 ]; then
+    if [ "${output_files[*]:-}" ]; then
 	_output_files=("${output_files[@]}")
-    elif [ "$output_files_ql" ]; then
+    elif [ "${output_files_ql:-}" ]; then
 	eval "_output_files=($(echo $output_files_ql))"
-    elif [ "$OUTPUT_FILES" ]; then
-	_output_files=($OUTPUT_FILES)
+    else
+	_output_files=(${OUTPUT_FILES:-})
     fi
 
-    for f in "${_input_files[@]}"; do
-	[ -r "$f" ] || crash "$f missing"
+    for ((i=0; i<${#_input_files[@]}; ++i)); do
+	f=${_input_files[$i]}
+	[ -r "$f" ] || crash "$(quote "$f"): missing"
     done
 
     local need_to_run=
-    for f in "${_output_files[@]}"; do
+    for ((j=0; j<${#_output_files[@]}; ++j)); do
+	f=${_output_files[$j]}
 	if [ ! -r "$f" ] ; then
-	    make_note "$f does not exist"
+	    make_note "$(quote "$f"): does not exist"
 	    need_to_run=1
 	    break
 	fi
     done
     if [ ! $need_to_run ]; then
-	for f in "${_output_files[@]}"; do
-	    for g in "${_input_files[@]}"; do
+	for ((j=0; j<${#_output_files[@]}; ++j)); do
+	    f=${_output_files[$j]}
+	    for ((i=0; i<${#_input_files[@]}; ++i)); do
+		g=${_input_files[$i]}
 		if [ "$g" -nt "$f" ]; then
-		    make_note "$g is newer than $f"
+		    make_note "$(quote "$g") is newer than $(quote "$f")"
 		    need_to_run=1
 		    break
 		fi
@@ -181,7 +185,7 @@ run_stage () {
 	done
     fi
     if [ ! $need_to_run ]; then
-	make_note "files up to date: $(quote "${_output_files[@]}")"
+	make_note "up to date: $(quote "${_output_files[@]:-}")"
     else
 	make_note "need to run"
 	typeset -f stage_command >&2
