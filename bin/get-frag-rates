@@ -153,10 +153,26 @@ run_stage
 STAGE_NUM=4
 STAGE_NAME="Compute smoothed fragment rates"
 frag_rate_fit_csv=$ngs_name.$ref_name.frag-rate.fit.csv
-unset input_files
-unset output_files
-#OUTPUT_FILES=$frag_rate_raw_csv
+input_files=("$frag_rate_raw_csv")
+output_files=("$frag_rate_fit_csv")
 stage_command () {
-    echo "Hi"
+    smooth-frag-rates.r "$frag_rate_raw_csv" >"$frag_rate_fit_csv"
+}
+run_stage
+
+
+#
+# Stage 5: Construct new pairing file
+#
+STAGE_NUM=5
+STAGE_NAME="Construct new pairing file"
+pairing_gc_rate_file=$ngs_name.$ref_name.pairing.gc-rate.csv
+input_files=("$pairing_file" "$frag_rate_fit_csv")
+output_files=("$pairing_gc_rate_file")
+stage_command () {
+    <"$frag_rate_fit_csv" tawk '{printf("%s\tgc%s:%.3e\n", $1, $2, $3)}' |
+    bedtools groupby -g 1 -c 2 -o collapse |
+    join -t "	" -j 1 ERX009609.test-gc5.pairing - |
+    tawk '{print $1, $2, $3 "," $4}' >"$pairing_gc_rate_file"
 }
 run_stage
