@@ -21,14 +21,14 @@ fullNameParser(const string& name, Clone& clone, int& nip)
   int i = 0;
   int j = name.find(':');
   // first is the num_rgid
-  if (global::num_rg_len > 0) {
+  if (global::rg_set.rg_num_id_len > 0) {
     string tmp = name.substr(i, j);
-    RGDict::iterator it = global::num_rg_dict.find(tmp);
-    if (it == global::num_rg_dict.end()) {
-      cerr << "error: no pairing info for RG of " << name << endl;
+    ReadGroup * rg_p = global::rg_set.find_by_num_id(tmp);
+    if (rg_p == NULL) {
+      cerr << "error: no pairing info for read group of " << name << endl;
       exit(1);
     }
-    clone.pairing = &it->second;
+    clone.pairing = rg_p->get_pairing();
   }
 
   i = j + 1;

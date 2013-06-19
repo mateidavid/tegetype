@@ -27,15 +27,15 @@ class Clone
 public:
   string name;
   Read read[2];
-  Contig* ref;
-  Pairing* pairing;
+  Contig * ref;
+  const Pairing * pairing;
   Interval<long long int> fragPos;
   vector<BP> bp;
   RepeatEvidence mappedToRepeatSt;
 
   bool use;
 
-  Clone(const string& _name = string())
+  Clone(const string & _name = string())
     : name(_name), ref(NULL), pairing(NULL) {
     read[0].st = 0;
     read[1].st = 0;
@@ -54,13 +54,13 @@ public:
   }
 };
 
-ostream& operator <<(ostream&, const Clone&);
-pair<int,Clone>* readFastq(istream&, void (*fullNameParser)(const string&, Clone&, int&));
-vector<Clone> readAllFastq(istream&,
-			   string (*cloneNameParser)(const string&),
-			   void (*fullNameParser)(const string&, Clone&, int&));
+ostream & operator <<(ostream &, const Clone &);
+pair<int,Clone> * readFastq(istream &, void (*fullNameParser)(const string &, Clone &, int &));
+vector<Clone> readAllFastq(istream &,
+			   string (*cloneNameParser)(const string &),
+			   void (*fullNameParser)(const string &, Clone &, int &));
 
-size_t size_below(const Clone&);
+size_t size_below(const Clone &);
 
 
 #endif

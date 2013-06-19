@@ -34,9 +34,13 @@ LDFLAGS += ${BAMTOOLS_LDFLAGS}
 #override CXXFLAGS+=-DGIT_VERSION=$(GIT_VERSION)
 
 
-OBJS := get-frag-gc.o get-ref-gc.o globals.o Pairing.o Fasta.o
+OBJS := get-frag-gc.o globals.o Pairing.o Fasta.o \
+	get-ref-gc.o \
+	get-te-evidence.o Clone.o CloneGen.o Mapping.o \
+	SamMapping.o SamMappingSetGen.o common.o Read.o Cigar.o \
+	DNASequence.o deep_size.o
 DEPS := $(OBJS:.o=.d)
-TGTS := get-frag-gc get-ref-gc
+TGTS := get-frag-gc get-ref-gc get-te-evidence
 BIN_PATH := ../bin
 TGTS_W_PATH := $(foreach tgt,${TGTS},${BIN_PATH}/${tgt})
 
@@ -52,8 +56,13 @@ clean:
 %.o : %.cpp
 	${CXX} ${CXXFLAGS} ${CPPFLAGS} -MMD -MP -o $@ -c $<
 
-%/get-frag-gc: get-frag-gc.o globals.o Pairing.o Fasta.o
+${BIN_PATH}/get-frag-gc: get-frag-gc.o globals.o Pairing.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lbamtools -lboost_iostreams
 
-%/get-ref-gc: get-ref-gc.o
+${BIN_PATH}/get-ref-gc: get-ref-gc.o
+	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams -lboost_regex
+
+${BIN_PATH}/get-te-evidence: get-te-evidence.o globals.o Clone.o CloneGen.o Mapping.o \
+	SamMapping.o SamMappingSetGen.o Pairing.o common.o Read.o Cigar.o \
+	DNASequence.o deep_size.o
 	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams -lboost_regex

@@ -19,10 +19,10 @@ public:
   string type;
   string value;
 
-  ExtraSamField(const string&);
+  ExtraSamField(const string &);
 };
 
-ostream& operator <<(ostream&, const ExtraSamField&);
+ostream & operator <<(ostream &, const ExtraSamField &);
 
 
 class SamMapping
@@ -47,11 +47,11 @@ public:
   bool is_ref;
 
   SamMapping() {}
-  SamMapping(const string&, SQDict*, bool);
+  SamMapping(const string &, SQDict *, bool);
 };
 
-ostream& operator <<(ostream&, const SamMapping&);
-Pairing* get_pairing_from_SamMapping(const SamMapping&);
+ostream & operator <<(ostream &, const SamMapping &);
+const Pairing * get_pairing_from_SamMapping(const SamMapping &);
 
 
 #endif
