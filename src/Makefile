@@ -38,12 +38,14 @@ OBJS := DNASequence.o Read.o Cigar.o Mapping.o Pairing.o Fasta.o \
 	Clone.o CloneGen.o SamMapping.o SamMappingSetGen.o \
 	globals.o common.o deep_size.o util.o \
 	get-frag-gc.o get-ref-gc.o get-te-evidence.o \
-	add-extra-sam-flags.o filter-mappings.o sam-to-fq.o
+	add-extra-sam-flags.o filter-mappings.o sam-to-fq.o \
+	zc.o
 
 DEPS := $(OBJS:.o=.d)
 
 TGTS := get-frag-gc get-ref-gc get-te-evidence \
-	add-extra-sam-flags filter-mappings sam-to-fq
+	add-extra-sam-flags filter-mappings sam-to-fq \
+	zc
 
 BIN_PATH := ../bin
 TGTS_W_PATH := $(foreach tgt,${TGTS},${BIN_PATH}/${tgt})
@@ -91,3 +93,5 @@ ${BIN_PATH}/sam-to-fq: sam-to-fq.o globals.o util.o deep_size.o Pairing.o \
 	Clone.o Mapping.o Cigar.o
 	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
 
+${BIN_PATH}/zc: zc.o
+	${LD} -o $@ $+ ${LDFLAGS}
