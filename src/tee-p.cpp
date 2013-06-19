@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cerrno>
 #include <vector>
+#include <unistd.h>
 
 using namespace std;
 
