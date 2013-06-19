@@ -5,5 +5,6 @@ add-extra-sam-flags
 filter-mappings
 sam-to-fq
 zc
+tee-p
 pigz
 pv
