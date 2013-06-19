@@ -1,0 +1,7 @@
+#!/bin/bash extend-hashbang
+#awk -f lib.alu-detect.awk -f
+
+{
+    s = get_read($0)
+    put_read(s)
+}
