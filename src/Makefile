@@ -94,4 +94,4 @@ ${BIN_PATH}/sam-to-fq: sam-to-fq.o globals.o util.o deep_size.o Pairing.o \
 	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
 
 ${BIN_PATH}/zc: zc.o
-	${LD} -o $@ $+ ${LDFLAGS}
+	${LD} -o $@ $+ ${LDFLAGS} -lz
