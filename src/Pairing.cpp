@@ -1,5 +1,7 @@
 #include "Pairing.hpp"
 
+#include <iomanip>
+
 #include "strtk/strtk.hpp"
 #include "Read.hpp"
 #include "globals.hpp"
@@ -20,23 +22,27 @@ Pairing::parse_token(const string& t)
     cerr << "could not parse pairing token: " << t << endl;
     exit(1);
   }
-  int val=atoi(itr->first);
+  int i_val = atoi(itr->first);
   if (!key.compare("paired")) {
-    paired = val;
+    paired = i_val;
   } else if (!key.compare("st_diff")) {
-    st_diff = val;
+    st_diff = i_val;
   } else if (!key.compare("min")) {
-    min = val;
+    min = i_val;
   } else if (!key.compare("max")) {
-    max = val;
+    max = i_val;
   } else if (!key.compare("mean")) {
-    mean = val;
+    mean = i_val;
   } else if (!key.compare("stddev")) {
-    stddev = val;
+    stddev = i_val;
   } else if (!key.compare("r1_len")) {
-    r_len[0] = val;
+    r_len[0] = i_val;
   } else if (!key.compare("r2_len")) {
-    r_len[1] = val;
+    r_len[1] = i_val;
+  } else if (!key.compare(0, 2, "gc")) {
+    if (frag_rate.size() == 0) frag_rate = vector<double>(100);
+    int bin_idx = atoi(key.substr(2).c_str());
+    frag_rate[bin_idx] = atof(itr->first);
   } else {
     cerr << "could not parse pairing token: " << t << endl;
     exit(1);
@@ -174,15 +180,21 @@ Pairing::pair_concordant(const Mapping& mapping0, int r0_st,
 ostream &
 operator <<(ostream & os, const Pairing& pairing)
 {
-  if (!pairing.paired) 
+  if (!pairing.paired) {
     os << "paired=0";
-  else
+  } else {
     os << "paired=1"
        << ",st_diff=" << pairing.st_diff
        << ",min=" << pairing.min
        << ",max=" << pairing.max
        << ",mean=" << pairing.mean
        << ",stddev=" << pairing.stddev;
+    if (pairing.frag_rate.size() > 0) {
+      for (int i = 0; i < 100; ++i) {
+	os << ",gc" << i << "=" << scientific << setprecision(3) << pairing.frag_rate[i];
+      }
+    }
+  }
   return os;
 }
 

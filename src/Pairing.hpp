@@ -21,6 +21,7 @@ public:
   int mean;
   int stddev;
   int r_len[2];
+  vector<double> frag_rate;
 
   Pairing() { paired = false; }
   Pairing(const string&);
