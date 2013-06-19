@@ -52,6 +52,7 @@ check_files_readable "$lib_settings_sh" "$lib_csv" "$lib_fa" \
 set_ref_var_names $ref_name
 check_files_readable "$ref_fa" "$ref_fai"
 
+[ "${orig_mappings[*]:-}" ] || crash "no mappings given"
 make_note "using mappings: $(quote "${orig_mappings[@]}" | tr '\n' ' ')"
 check_files_readable "${orig_mappings[@]}"
 
