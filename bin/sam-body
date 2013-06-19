@@ -1,0 +1,14 @@
+#!/bin/bash
+exec 0< <(exec zc "$@")
+
+IFS=$'\n'
+have_line=
+while read -r line ; do
+    have_line=1
+    [ "${line:0:1}" = "@" ] || break
+    have_line=
+done
+
+[ ! $have_line ] || echo $line
+
+exec zc
