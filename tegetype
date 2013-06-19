@@ -6,13 +6,14 @@ set -eEu -o pipefail
 this=${BASH_SOURCE[0]}
 while [ -h "$this" ]; do this=$(readlink "$this"); done
 export BASE_DIR=$(cd -P "$(dirname "$this")"; pwd)
+source "$BASE_DIR"/bin/lib.common.sh
+add_to_path "$BASE_DIR"/bin PATH
+export AWKPATH=${AWKPATH:-}
+add_to_path "$BASE_DIR"/bin AWKPATH
 source "$BASE_DIR"/bin/lib.tegetype.sh
 
 make_note "$(basename "$this") v$(cat $BASE_DIR/VERSION) (git:$($BASE_DIR/get_git_version)) installed in $BASE_DIR"
 
-add_to_path "$BASE_DIR"/bin PATH
-export AWKPATH=${AWKPATH:-}
-add_to_path "$BASE_DIR"/bin AWKPATH
 
 prog_list=(add-ref list-ref del-ref add-lib list-lib del-lib getype get-frag-rates)
 
