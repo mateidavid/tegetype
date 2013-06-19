@@ -7,9 +7,37 @@
 source lib.tegetype.sh
 set -eEu -o pipefail
 
+#
+# don't trust the user; check paths
+#
+(cmd_exists python && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) ||
+crash "python2.6+ not found"
+cmd_exists samtools || crash "samtools not found"
+cmd_exists bedtools || crash "bedtools not found"
+cmd_exists bowtie2 || crash "bowtie2 not found"
+
 usage () {
     echo "Use: $(basename $0) <ngs_name> <lib_name>"
 }
+
+orig_mappings=()
+[ ! "${ORIG_MAPPINGS:-}" ] || eval "orig_mappings=($(echo $ORIG_MAPPINGS))"
+gender=${GENDER:-m}
+OPTIND=1
+while getopts "m:" OPT "$@"; do
+    case $OPT in
+	m)
+	    orig_mappings+=("$OPTARG")
+	    ;;
+	g)
+	    if [ ! "$OPTARG" = "m" ] && [ ! "$OPTARG" = "f" ]; then
+		crash "unrecognized gender: [$OPTARG]"
+	    fi
+	    gender=$OPTARG
+	    ;;
+    esac
+done
+shift $(($OPTIND - 1))
 
 if [ $# -ne 2 ]; then
     usage >&2
@@ -24,15 +52,24 @@ check_files_readable "$lib_settings_sh" "$lib_csv" "$lib_fa" \
 set_ref_var_names $ref_name
 check_files_readable "$ref_fa" "$ref_fai"
 
+make_note "using mappings: $(quote "${orig_mappings[@]}" | tr '\n' ' ')"
+check_files_readable "${orig_mappings[@]}"
 
-#
-# don't trust the user; check most settings
-#
-(cmd_exists python && [ "$(python --version 2>&1 | cut -d '.' -f 2)" -ge 6 ]) ||
-crash "python2.6+ not found"
-cmd_exists samtools || crash "samtools not found"
-cmd_exists bedtools || crash "bedtools not found"
-cmd_exists bowtie2 || crash "bowtie2 not found"
+for f in "${orig_mappings[@]}"; do
+    (set +o pipefail; zc "$f" | head -n 1 | cut -c -3 | grep -q "BAM") ||
+    crash "$f: not a BAM file"
+    (set +o pipefail; samtools view -H "$f" | head -n 1 | grep -q "coordinate") ||
+    crash "$f: not sorted by coordinate"
+done
+
+make_note "using reads group(s): [${ORIG_READ_GROUPS:-}]"
+eval "orig_read_groups=($(echo ${ORIG_READ_GROUPS:-}))"
+
+make_note "dropping pairs mapped to different chromosomes: $(([ ${DROP_PAIRS_DIFF_CHR:-} ] && echo "yes") || echo "no")"
+
+orig_mappings_rsort=()
+[ ! "${ORIG_MAPPINGS_RSORT:-}" ] || eval "orig_mappings_rsort=($(echo $ORIG_MAPPINGS_RSORT))"
+make_note "gender: $gender"
 
 
 make_note "using NCPU=$NCPU"
@@ -73,38 +110,19 @@ get_mappings_by_read_name() {
 }
 
 
-make_note "using mapping file(s): [$ORIG_MAPPINGS]"
-ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "could not find mappings"
-orig_mappings=($(ls $ORIG_MAPPINGS))
-for f in ${orig_mappings[@]}; do
-    (set +o pipefail; zc $f | head -n 1 | cut -c -3 | grep -q "BAM") ||
-    crash "$f: not a BAM file"
-    (set +o pipefail; samtools view -H $f | head -n 1 | grep -q "coordinate") ||
-    crash "$f: not sorted by coordinate"
-done
-
-make_note "using reads group(s): [${ORIG_READ_GROUPS:-}]"
-orig_read_groups=($(echo ${ORIG_READ_GROUPS:-}))
-
-make_note "dropping pairs mapped to different chromosomes: $(([ ${DROP_PAIRS_DIFF_CHR:-} ] && echo "yes") || echo "no")"
-
-orig_mappings_rsort=()
-[ ! "${ORIG_MAPPINGS_RSORT:-}" ] || orig_mappings_rsort=($(ls $ORIG_MAPPINGS_RSORT))
-
-
 # check largest chromosome size; build chr maps
 largest_chr_idx=$(set +o pipefail; sort -k 2,2nr "$ref_fai" | head -n 1 | cut -f 2)
-for f in ${orig_mappings[@]}; do
-    largest_chr_file=$(set +o pipefail; samtools view -H $f | sam-get-fai | sort -k 2,2nr | head -n 1 | cut -f 2)
+for f in "${orig_mappings[@]}"; do
+    largest_chr_file=$(set +o pipefail; samtools view -H "$f" | sam-get-fai | sort -k 2,2nr | head -n 1 | cut -f 2)
     [ "$largest_chr_idx" = "$largest_chr_file" ] ||
     crash "largest chr in file [$f] different than the one in index"
     # if map doesn't exist, create it
-    [ -r $(basename $f).chr_map ] ||
+    [ -r $(basename "$f").chr_map ] ||
     join -j 2 -t "	" \
 	<(sort -k 2,2 $ref_fai | cut -f 1,2) \
-	<(samtools view -H $f | sam-get-fai | sort -k 2,2) |
+	<(samtools view -H "$f" | sam-get-fai | sort -k 2,2) |
     sort -k 1,1nr |
-    cut -f 2,3 >$(basename $f).chr_map
+    cut -f 2,3 >$(basename "$f").chr_map
 done
 
 
@@ -114,8 +132,8 @@ done
 STAGE_NUM=1
 STAGE_NAME="detect pairing information"
 pairing_file=$ngs_name.$ref_name.pairing
-INPUT_FILES="${orig_mappings[@]}"
-OUTPUT_FILES="$pairing_file"
+input_files=("${orig_mappings[@]}")
+output_files=("$pairing_file")
 stage_command () {
     rm -f $pairing_file.tmp
     i=0
@@ -147,8 +165,8 @@ rg_string=($(sort -s -k 2,2n $pairing_file | cut -f 1))
 STAGE_NUM=2
 STAGE_NAME="extract discordant reads"
 reads_to_remap=$ngs_name.$ref_name.reads.to_remap
-INPUT_FILES="${orig_mappings[@]}"
-OUTPUT_FILES=$(for rg in ${rg_string[@]}; do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done)
+input_files=("${orig_mappings[@]}")
+output_files=($(for rg in ${rg_string[@]}; do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done))
 stage_command () {
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
@@ -178,8 +196,8 @@ run_stage
 STAGE_NUM=3
 STAGE_NAME="mapping to alternate alleles"
 mappings_to_alt=$ngs_name.$lib_name.map.to_ref+alt_lib
-INPUT_FILES=$(for rg in ${rg_string[@]}; do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done)
-OUTPUT_FILES=$(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done)
+input_files=($(for rg in ${rg_string[@]}; do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done))
+output_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done))
 stage_command () {
     while read -r -a line; do
 	make_note "remapping read group [${line[0]}]"
@@ -203,8 +221,8 @@ run_stage
 STAGE_NUM=5
 STAGE_NAME="sort alternate mappings"
 mappings_to_alt_sort=$mappings_to_alt.merge.sort
-INPUT_FILES=$(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done)
-OUTPUT_FILES="$mappings_to_alt_sort.bam"
+input_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done))
+output_files=("$mappings_to_alt_sort.bam")
 stage_command () {
     samtools merge -u -h <(bam-merge-rg-headers $INPUT_FILES) - $INPUT_FILES |
     samtools sort -m 10000000000 - $mappings_to_alt_sort
@@ -214,13 +232,13 @@ run_stage
 
 
 #
-# Stage 6: Genotype reference allele
+# Stage 6: Gather evidence for reference allele
 #
 STAGE_NUM=6
-STAGE_NAME="gather evidence for reference allele"
+STAGE_NAME="Gather evidence for reference allele"
 ref_evidence=$ngs_name.$lib_name.ref-evidence
-INPUT_FILES="${orig_mappings[@]} $mappings_to_alt_sort.bam"
-OUTPUT_FILES=$ref_evidence.csv
+input_files=("${orig_mappings[@]}" "$mappings_to_alt_sort.bam")
+output_files=("$ref_evidence.csv")
 stage_command () {
     rm -f $ref_evidence.csv $ref_evidence.log
     while read -r -a line; do
@@ -253,13 +271,13 @@ run_stage
 
 
 #
-# Stage 7: Genotype alternate allele
+# Stage 7: Gather evidence for alternate allele
 #
 STAGE_NUM=7
-STAGE_NAME="gather evidence for alternate allele"
+STAGE_NAME="Gather evidence for alternate allele"
 alt_evidence=$ngs_name.$lib_name.alt-evidence
-INPUT_FILES=$mappings_to_alt_sort.bam
-OUTPUT_FILES=$alt_evidence.csv
+input_files=("$mappings_to_alt_sort.bam")
+output_files=("$alt_evidence.csv")
 stage_command () {
     rm -f $alt_evidence.csv $alt_evidence.log
     while read -r -a line; do
@@ -278,3 +296,16 @@ stage_command () {
     done <$lib_csv
 }
 run_stage
+
+
+#
+# Stage 8: Compute fragment rates
+#
+STAGE_NUM=8
+STAGE_NAME="Compute fragment rates"
+pairing_gc_rate_file=$ngs_name.$ref_name.pairing.gc-rate.csv
+input_files=("${orig_mappings[@]}" "$pairing_file")
+output_files=("$pairing_gc_rate_file")
+stage_command () {
+    ORIG_MAPPINGS=$(quote "${orig_mappings[@]}") get-frag-rates $ngs_name $ref_name
+}
