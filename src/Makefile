@@ -17,8 +17,8 @@ ifndef CXXFLAGS
   endif
 endif
 
-CXXFLAGS += -std=c++0x -mmmx -msse -msse2 -fopenmp
-CXXFLAGS += -Wall -Wextra
+CXXFLAGS += -std=c++0x -mmmx -msse -msse2 -fopenmp -Wall -Wextra
+LDFLAGS += -fopenmp
 -include Makefile.local
 
 
@@ -34,15 +34,20 @@ LDFLAGS += ${BAMTOOLS_LDFLAGS}
 #override CXXFLAGS+=-DGIT_VERSION=$(GIT_VERSION)
 
 
-OBJS := get-frag-gc.o globals.o Pairing.o Fasta.o \
-	get-ref-gc.o \
-	get-te-evidence.o Clone.o CloneGen.o Mapping.o \
-	SamMapping.o SamMappingSetGen.o common.o Read.o Cigar.o \
-	DNASequence.o deep_size.o
+OBJS := DNASequence.o Read.o Cigar.o Mapping.o Pairing.o Fasta.o \
+	Clone.o CloneGen.o SamMapping.o SamMappingSetGen.o \
+	globals.o common.o deep_size.o util.o \
+	get-frag-gc.o get-ref-gc.o get-te-evidence.o \
+	add-extra-sam-flags.o filter-mappings.o sam-to-fq.o
+
 DEPS := $(OBJS:.o=.d)
-TGTS := get-frag-gc get-ref-gc get-te-evidence
+
+TGTS := get-frag-gc get-ref-gc get-te-evidence \
+	add-extra-sam-flags filter-mappings sam-to-fq
+
 BIN_PATH := ../bin
 TGTS_W_PATH := $(foreach tgt,${TGTS},${BIN_PATH}/${tgt})
+
 
 .PHONY: all clean
 
@@ -56,6 +61,10 @@ clean:
 %.o : %.cpp
 	${CXX} ${CXXFLAGS} ${CPPFLAGS} -MMD -MP -o $@ -c $<
 
+%.o : %.c
+	${CXX} ${CXXFLAGS} ${CPPFLAGS} -MMD -MP -o $@ -c $<
+
+
 ${BIN_PATH}/get-frag-gc: get-frag-gc.o globals.o Pairing.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lbamtools -lboost_iostreams
 
@@ -65,4 +74,20 @@ ${BIN_PATH}/get-ref-gc: get-ref-gc.o
 ${BIN_PATH}/get-te-evidence: get-te-evidence.o globals.o Clone.o CloneGen.o Mapping.o \
 	SamMapping.o SamMappingSetGen.o Pairing.o common.o Read.o Cigar.o \
 	DNASequence.o deep_size.o
-	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams -lboost_regex
+	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
+
+${BIN_PATH}/add-extra-sam-flags: add-extra-sam-flags.o globals.o util.o deep_size.o \
+	Pairing.o DNASequence.o Read.o Mapping.o CloneGen.o \
+	SamMapping.o SamMappingSetGen.o common.o Cigar.o Clone.o
+	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
+
+${BIN_PATH}/filter-mappings: filter-mappings.o globals.o util.o deep_size.o Pairing.o \
+	DNASequence.o Read.o CloneGen.o SamMapping.o SamMappingSetGen.o common.o \
+	Clone.o Mapping.o Cigar.o
+	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
+
+${BIN_PATH}/sam-to-fq: sam-to-fq.o globals.o util.o deep_size.o Pairing.o \
+	DNASequence.o Read.o CloneGen.o SamMapping.o SamMappingSetGen.o common.o \
+	Clone.o Mapping.o Cigar.o
+	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
+

@@ -7,7 +7,7 @@ using namespace std;
 #include <vector>
 #include <omp.h>
 
-#include "gzstream/gzstream.h"
+#include "igzstream.hpp"
 #include "strtk/strtk.hpp"
 #include "globals.hpp"
 #include "Read.hpp"
@@ -116,13 +116,13 @@ void
 process_mapping_set(const string& s, vector<SamMapping>& v,
 		    map<string,stringstream*>& out_str) //, ostream* err_str)
 {
-  if ((global::rg_dict.size() == 0 and v.size() != 1)
-      or (global::rg_dict.size() > 0 and v.size() != 2)) {
+  if ((global::rg_set.rg_list.size() == 0 and v.size() != 1)
+      or (global::rg_set.rg_list.size() > 0 and v.size() != 2)) {
     cerr << "incorrect number of mappings for clone [" << s << "]" << endl;
     exit(1);
   }
 
-  if (global::rg_dict.size() == 0) {
+  if (global::rg_set.rg_list.size() == 0) {
     for (size_t i = 0; i < filter_vector.size(); ++i) {
       Filter& f = filter_vector[i];
       if (((v[0].flags.to_ulong() & f.must_have[0]) == f.must_have[0])
@@ -197,7 +197,7 @@ add_filter(const string& s)
   string conditions = s.substr(0, i);
   f.dest_file = s.substr(i + 1);
 
-  if (global::rg_dict.size() == 0) {
+  if (global::rg_set.rg_list.size() == 0) {
     f.must_have = vector<unsigned long>(1);
     f.must_not_have = vector<unsigned long>(1);
 
@@ -252,7 +252,7 @@ add_filter(const string& s)
 
   if (global::verbosity > 0) {
     clog << "added filter: " << "0x" << hex << f.must_have[0] << "/" << "0x" << hex << f.must_not_have[0];
-    if (global::rg_dict.size() > 0)
+    if (global::rg_set.rg_list.size() > 0)
       clog << "," << "0x" << hex << f.must_have[1] << "/" << "0x" << hex << f.must_not_have[1];
     clog << "," << f.stop_on_hit << ":" << f.dest_file << '\n';
   }
@@ -285,7 +285,7 @@ main(int argc, char* argv[])
       //add_filter(optarg);
       break;
     case 'g':
-      global::default_rg = optarg;
+      global::default_rg_name = optarg;
       break;
     case 'v':
       global::verbosity++;
@@ -304,10 +304,12 @@ main(int argc, char* argv[])
   if (global::verbosity > 0) clog << "number of threads: " << num_threads << '\n';
 
   if (pairing_file.size() > 0) {
-    igzstream pairingIn(pairing_file.c_str());
-    if (!pairingIn) { cerr << "error opening pairing file: " << pairing_file << endl; exit(1); }
-    load_pairing(pairingIn, global::rg_dict, global::num_rg_dict, global::rg_to_num_rg_dict);
-    pairingIn.close();
+    igzstream pairingIn(pairing_file);
+    if (!pairingIn) {
+      cerr << "error opening pairing file: " << pairing_file << "\n";
+      exit(1);
+    }
+    global::rg_set.load(pairingIn);
   }
 
   for (size_t i = 0; i < filter_list.size(); ++i) {
@@ -422,7 +424,6 @@ main(int argc, char* argv[])
     }
     //omp_destroy_lock(&input_lock);
 
-    mapIn.close();
     for (map<string,FILE*>::iterator it = file_map.begin();
 	 it != file_map.end(); ++it) {
       fclose(it->second);
