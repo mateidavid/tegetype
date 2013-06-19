@@ -171,7 +171,7 @@ pairing_gc_rate_file=$ngs_name.$ref_name.pairing.gc-rate.csv
 input_files=("$pairing_file" "$frag_rate_fit_csv")
 output_files=("$pairing_gc_rate_file")
 stage_command () {
-    <"$frag_rate_fit_csv" tawk '{printf("%s\tgc%s:%.3e\n", $1, $2, $3)}' |
+    <"$frag_rate_fit_csv" tawk '{printf("%s\tgc%s=%.3e\n", $1, $2, $3)}' |
     bedtools groupby -g 1 -c 2 -o collapse |
     join -t "	" -j 1 "$pairing_file" - |
     tawk '{print $1, $2, $3 "," $4}' >"$pairing_gc_rate_file"
