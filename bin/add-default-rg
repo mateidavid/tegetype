@@ -1,0 +1,53 @@
+#!/bin/bash
+. lib.alu-detect.sh
+set -eE -o pipefail
+
+rg=${RG:-}
+sample=${SAMPLE:-}
+use_zc=
+
+OPTIND=1
+while getopts "r:s:z" OPT "$@"; do
+    case $OPT in
+	r)
+	    rg=$OPTARG
+	    ;;
+	s)
+	    sample=$OPTARG
+	    ;;
+	z)
+	    use_zc=1
+	    ;;
+	*)
+	    crash "invalid option: $OPT"
+	    ;;
+    esac
+done
+shift $(($OPTIND - 1))
+
+[ "$rg" ] || crash "$0: default read group not specified"
+
+([ $# -eq 0 ] && [ ! $use_zc ]) || { exec < <(exec zc "$@"); make_note "using zc"; }
+
+IFS=$'\n'
+have_line=
+have_rg_line=
+while read -r line; do
+    have_line=1
+    [ "${line:0:1}" = "@" ] || break
+    if [ ${line:0:3} = "@RG" ] && [[ ${line[@]} =~ "	ID:$rg" ]]; then
+	if [ ! "$sample" ] || [[ "${line[@]}" =~ "	SM:$sample" ]]; then
+	    have_rg_line=1
+	    echo $line
+	fi
+    else
+	echo $line
+    fi
+    have_line=
+done
+
+[ $have_rg_line ] || printab "@RG" "ID:$rg" $([ ! "$sample" ] || echo "SM:$sample")
+{
+    [ ! $have_line ] || echo $line
+    exec cat
+} | tawk -v rg=$rg '/\tRG:/ {print; next} {print $0, "RG:Z:" rg}'
