@@ -228,7 +228,7 @@ mappings_to_alt_sort=$mappings_to_alt.merge.sort
 input_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done))
 output_files=("$mappings_to_alt_sort.bam")
 stage_command () {
-    samtools merge -u -h <(bam-merge-rg-headers $INPUT_FILES) - $INPUT_FILES |
+    samtools merge -u -h <(bam-merge-rg-headers "${input_files[@]}") - "${input_files[@]}" |
     samtools sort -m 10000000000 - $mappings_to_alt_sort
     samtools index $mappings_to_alt_sort.bam
 }
