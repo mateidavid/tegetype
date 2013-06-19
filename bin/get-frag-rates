@@ -20,10 +20,7 @@ usage () {
 }
 
 orig_mappings=()
-if [ "${ORIG_MAPPINGS:-}" ]; then
-    ls $ORIG_MAPPINGS >/dev/null 2>&1 || crash "$ORIG_MAPPINGS: could not find mappings"
-    orig_mappings=($(ls $ORIG_MAPPINGS))
-fi
+[ ! "${ORIG_MAPPINGS:-}" ] || eval "orig_mappings=($(echo $ORIG_MAPPINGS))"
 gender=${GENDER:-m}
 OPTIND=1
 while getopts "m:" OPT "$@"; do
