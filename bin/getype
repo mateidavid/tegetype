@@ -85,12 +85,12 @@ make_note "using MIN_MQV=$MIN_MQV"
 
 get_mappings_by_read_name() {
     local file=${orig_mappings_rsort[$1]:-${orig_mappings[$1]}}
-    [ -r $file ] || crash "$file: file not found"
+    [ -r "$file" ] || crash "$file: file not found"
     local rg=${orig_read_groups[$1]:-}
     command="$PV $file"
-    if (set +o pipefail; zc $file | head -n 1 | cut -c -3 | grep -q "BAM"); then
+    if (set +o pipefail; zc "$file" | head -n 1 | cut -c -3 | grep -q "BAM"); then
 	command="$command | samtools view -h -"
-    elif (set +o pipefail; file $file | grep -q gzip); then
+    elif (set +o pipefail; file "$file" | grep -q gzip); then
 	command="$command | $UNZIP"
     fi
     if [ ${DROP_PAIRS_DIFF_CHR:-} ]; then
@@ -99,7 +99,7 @@ get_mappings_by_read_name() {
     if [ ${add_dummy_pairs:-} ]; then
 	command="$command | add-dummy-pairs"
     fi
-    if (set +o pipefail; zc $file | head -n 1 | grep -q "coordinate") || [ "${RSORT:-}" ]; then
+    if (set +o pipefail; zc "$file" | head -n 1 | grep -q "coordinate") || [ "${RSORT:-}" ]; then
 	command="$command | sam-rsort"
     fi
     if [ "$rg" ]; then
