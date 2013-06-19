@@ -87,11 +87,14 @@ get_mappings_by_read_name() {
     local file=${orig_mappings_rsort[$1]:-${orig_mappings[$1]}}
     [ -r "$file" ] || crash "$file: file not found"
     local rg=${orig_read_groups[$1]:-}
+    local get_header_cmd=
     command="$PV $file"
     if (set +o pipefail; zc "$file" | head -n 1 | cut -c -3 | grep -q "BAM"); then
 	command="$command | samtools view -h -"
+	get_header_cmd="samtools view -H $(quote "$file")"
     elif (set +o pipefail; file "$file" | grep -q gzip); then
 	command="$command | $UNZIP"
+	get_header_cmd="sam-header $(quote "$file")"
     fi
     if [ ${DROP_PAIRS_DIFF_CHR:-} ]; then
 	command="$command | tawk 'substr(\$1,1,1)==\"@\" || and(\$2,0x1)==0 || and(\$2,0x4)==1 || and(\$2,0x8)==1 || \$7==\"=\"'" 
@@ -99,7 +102,7 @@ get_mappings_by_read_name() {
     if [ ${add_dummy_pairs:-} ]; then
 	command="$command | add-dummy-pairs"
     fi
-    if (set +o pipefail; zc "$file" | head -n 1 | grep -q "coordinate") || [ "${RSORT:-}" ]; then
+    if (set +o pipefail; eval "$get_header_cmd" | head -n 1 | grep -q "coordinate") || [ "${RSORT:-}" ]; then
 	command="$command | sam-rsort"
     fi
     if [ "$rg" ]; then
