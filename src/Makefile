@@ -37,13 +37,13 @@ LDFLAGS += ${BAMTOOLS_LDFLAGS}
 OBJS := DNASequence.o Read.o Cigar.o Mapping.o Pairing.o Fasta.o \
 	Clone.o CloneGen.o SamMapping.o SamMappingSetGen.o \
 	globals.o common.o deep_size.o util.o \
-	get-frag-gc.o get-ref-gc.o get-te-evidence.o \
+	get-frag-gc.o get-ref-gc.o get-te-evidence.o combine-evidence.o \
 	add-extra-sam-flags.o filter-mappings.o sam-to-fq.o \
 	zc.o tee-p.o printab.o
 
 DEPS := $(OBJS:.o=.d)
 
-TGTS := get-frag-gc get-ref-gc get-te-evidence \
+TGTS := get-frag-gc get-ref-gc get-te-evidence combine-evidence \
 	add-extra-sam-flags filter-mappings sam-to-fq \
 	zc tee-p printab
 
@@ -76,6 +76,9 @@ ${BIN_PATH}/get-ref-gc: get-ref-gc.o
 ${BIN_PATH}/get-te-evidence: get-te-evidence.o globals.o Clone.o CloneGen.o Mapping.o \
 	SamMapping.o SamMappingSetGen.o Pairing.o common.o Read.o Cigar.o \
 	DNASequence.o deep_size.o
+	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
+
+${BIN_PATH}/combine-evidence: combine-evidence.o globals.o Pairing.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
 
 ${BIN_PATH}/add-extra-sam-flags: add-extra-sam-flags.o globals.o util.o deep_size.o \

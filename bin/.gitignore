@@ -1,6 +1,7 @@
 get-ref-gc
 get-frag-gc
 get-te-evidence
+combine-evidence
 add-extra-sam-flags
 filter-mappings
 sam-to-fq
