@@ -313,3 +313,4 @@ output_files=("$pairing_gc_rate_file")
 stage_command () {
     ORIG_MAPPINGS=$(quote "${orig_mappings[@]}") get-frag-rates $ngs_name $ref_name
 }
+run_stage
