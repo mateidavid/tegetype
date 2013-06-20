@@ -72,6 +72,7 @@ public:
   ReadGroup * find_by_name(const string &);
   ReadGroup * find_by_num_id(const string &);
   ReadGroup * find_by_idx(int i) { return &rg_list[i]; }
+  int get_idx(const ReadGroup *);
 };
 
 ostream & operator <<(ostream &, const ReadGroupSet &);

@@ -288,6 +288,15 @@ ReadGroupSet::find_by_num_id(const string & s) {
   return find_by_idx(rg_num_id_dict[s]);
 }
 
+int
+ReadGroupSet::get_idx(const ReadGroup * rg_p) {
+  if (rg_list.size() == 0 or rg_p < &rg_list[0] or rg_p > &rg_list[rg_list.size() - 1]) {
+    cerr << "get_idx error: read group [" << *rg_p << "] not in current set:" << *this;
+    exit(EXIT_FAILURE);
+  }
+  return int(rg_p - &rg_list[0]);
+}
+
 
 ostream &
 operator << (ostream & os, const ReadGroupSet & rgs) {
