@@ -86,7 +86,23 @@ main(int argc, char* argv[])
   igzstream ref_evidence_is(ref_evidence_file);
   igzstream alt_evidence_is(alt_evidence_file);
 
+  int n_lines = 0;
+  while (true) {
+    string lib_line;
+    string ref_evidence_line;
+    string alt_evidence_line;
+    bool got_lib_line = getline(lib_is, lib_line);
+    bool got_ref_evidence_line = getline(ref_evidence_is, ref_evidence_line);
+    bool got_alt_evidence_line = getline(alt_evidence_is, alt_evidence_line);
 
+    if (got_lib_line != got_ref_evidence_line or got_lib_line != got_alt_evidence_line) {
+      cerr << "error reading line " << n_lines+1 << " from lib/ref_evidence/alt_evidence files\n";
+      exit(EXIT_FAILURE);
+    }
+    if (not got_lib_line) break;
+
+    // got one line from each file
+  }
 
   return EXIT_SUCCESS;
 }
