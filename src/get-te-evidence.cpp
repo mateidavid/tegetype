@@ -330,6 +330,16 @@ main(int argc, char* argv[])
     exit(EXIT_FAILURE);
   }
 
+  // load pairing file
+  {
+    igzstream pairing_is(pairing_file);
+    if (!pairing_is) {
+      cerr << "error opening pairing file: " << pairing_file << "\n";
+      exit(EXIT_FAILURE);
+    }
+    global::rg_set.load(pairing_is);
+  }
+
   //if (global::verbosity > 0) clog << "number of threads: " << num_threads << '\n';
   if (tsd.size() == 1) {
     cluster = vector<vector<vector<int>>>
@@ -352,16 +362,6 @@ main(int argc, char* argv[])
     clog << "min_mqv: [" << min_mqv << "]\n";
     clog << "internal naming: [" << (cnp == default_cnp? "no" : "yes") << "]\n";
   }    
-
-  // load pairing file
-  {
-    igzstream pairing_is(pairing_file);
-    if (!pairing_is) {
-      cerr << "error opening pairing file: " << pairing_file << "\n";
-      exit(EXIT_FAILURE);
-    }
-    global::rg_set.load(pairing_is);
-  }
 
   {
     igzstream mapIn(optind < argc? argv[optind] : "-");
