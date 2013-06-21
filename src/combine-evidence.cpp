@@ -12,10 +12,124 @@ using namespace std;
 string prog_name;
 
 
+int
+get_count_from_frag_list(const string & s)
+{
+  using namespace strtk;
+
+  int res = 0;
+  std_string::token_list_type token_list[3];
+  split(";", s, back_inserter(token_list[0]));
+  for_each(token_list[0].begin(), token_list[0].end(), [&] (const std_string::token_list_type::value_type & t) {
+      token_list[1].clear();
+      clog << "t=" << string(t.first, t.second) << "\n";
+      split(single_delimiter_predicate<std::string::value_type>(':'),
+	    t, back_inserter(token_list[1]));
+      clog << "token_list[1][0]=" << string(token_list[1].front().first, token_list[1].front().second) << "\n";
+      if (token_list[1].size() != 2) {
+	cerr << "error parsing frag list: " << s << "\n";
+	exit(EXIT_FAILURE);
+      }
+      token_list[2].clear();
+      split(single_delimiter_predicate<std::string::value_type>(','),
+	    token_list[1].back(), back_inserter(token_list[2]));
+      res += token_list[2].size();
+    });
+  return res;
+}
+
+void
+process_locus(const string & lib_line, const string & ref_evidence_line,
+	      const string & alt_evidence_line)
+{
+  //strtk::ignore_token ignore;
+
+  string locus_name;
+  string s[4];
+  string ref_chr;
+  string alt_chr;
+  long long ref_tsd[2][2];
+  long long alt_tsd[2][2];
+  bool is_insertion;
+
+  // parse lib line
+  strtk::std_string::token_list_type token_list;
+  strtk::split("\t", lib_line, back_inserter(token_list));
+  if (token_list.size() < 15) {
+    cerr << "could not parse lib line: " << lib_line << "\n";
+    exit(EXIT_FAILURE);
+  }
+  auto itr = token_list.begin();
+  locus_name = string(itr->first, itr->second);
+  ++itr;
+  ref_chr = string(itr->first, itr->second);
+  ++itr;
+  ++itr;
+  ++itr;
+  ref_tsd[0][0] = atoll(itr->first);
+  ++itr;
+  ref_tsd[0][1] = atoll(itr->first);
+  ++itr;
+  s[0] = string(itr->first, itr->second);
+  ++itr;
+  s[1] = string(itr->first, itr->second);
+  ++itr;
+  alt_chr = string(itr->first, itr->second);
+  ++itr;
+  ++itr;
+  ++itr;
+  alt_tsd[0][0] = atoll(itr->first);
+  ++itr;
+  alt_tsd[0][1] = atoll(itr->first);
+  ++itr;
+  s[2] = string(itr->first, itr->second);
+  ++itr;
+  s[3] = string(itr->first, itr->second);
+
+  if (s[0] == ".") {
+    is_insertion = true;
+    alt_tsd[1][0] = atoll(s[2].c_str());
+    alt_tsd[1][1] = atoll(s[3].c_str());
+  } else {
+    is_insertion = false;
+    ref_tsd[1][0] = atoll(s[0].c_str());
+    ref_tsd[1][1] = atoll(s[1].c_str());
+  }
+
+  int count[7];
+  // parse ref_evidence & alt_evidence lines
+  if (is_insertion) {
+    if (not strtk::parse(ref_evidence_line, "\t", count[2], s[0])
+	or not strtk::parse(alt_evidence_line, "\t", count[0], count[1],
+			    s[1], s[2], s[3])) {
+      cerr << "could not parse ref/alt evidence lines:\n" << ref_evidence_line << "\n" << alt_evidence_line << "\n";
+      exit(EXIT_FAILURE);
+    }
+    count[3] = get_count_from_frag_list(s[2]);
+    count[4] = get_count_from_frag_list(s[3]);
+    count[6] = get_count_from_frag_list(s[1]);
+    count[5] = get_count_from_frag_list(s[0]);
+  } else {
+    if (not strtk::parse(ref_evidence_line, "\t", count[0], count[1], s[0], s[1], s[2])
+	or not strtk::parse(alt_evidence_line, "\t", count[2], s[3])) {
+      cerr << "could not parse ref/alt evidence lines:\n" << ref_evidence_line << "\n" << alt_evidence_line << "\n";
+      exit(EXIT_FAILURE);
+    }
+    count[3] = get_count_from_frag_list(s[1]);
+    count[4] = get_count_from_frag_list(s[2]);
+    count[6] = get_count_from_frag_list(s[0]);
+    count[5] = get_count_from_frag_list(s[3]);
+  }
+
+  clog << locus_name << "\t" << count[0] << "\t" << count[1] << "\t" << count[2] << "\t"
+       << count[3] << "\t" << count[4] << "\t" << count[5] << "\t" << count[6] << "\n";
+}
+
+
 void
 usage(ostream & os)
 {
-  os << "use: " << prog_name << " -f <fasta_file> -l <pairing_file> -L <lib_file> -r <ref_evidence_file> -a <alt_evidence_file>\n";
+  os << "use: " << prog_name << " -f <ref_fasta_file> -g <alt_fasta_file> -l <pairing_file> -L <lib_file> -r <ref_evidence_file> -a <alt_evidence_file>\n";
 }
 
 
@@ -23,20 +137,24 @@ int
 main(int argc, char* argv[])
 {
   prog_name = argv[0];
-  string fasta_file;
+  string ref_fasta_file;
+  string alt_fasta_file;
   string pairing_file;
   string lib_file;
   string ref_evidence_file;
   string alt_evidence_file;
 
   char c;
-  while ((c = getopt(argc, argv, "vf:l:L:r:a:h")) != -1) {
+  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:h")) != -1) {
     switch (c) {
     case 'v':
       global::verbosity++;
       break;
     case 'f':
-      fasta_file = optarg;
+      ref_fasta_file = optarg;
+      break;
+    case 'g':
+      alt_fasta_file = optarg;
       break;
     case 'l':
       pairing_file = optarg;
@@ -64,7 +182,8 @@ main(int argc, char* argv[])
     exit(EXIT_FAILURE);
   }
 
-  if (fasta_file == "") { cerr << "missing fasta file\n"; exit(EXIT_FAILURE); }
+  if (ref_fasta_file == "") { cerr << "missing ref fasta file\n"; exit(EXIT_FAILURE); }
+  if (alt_fasta_file == "") { cerr << "missing alt fasta file\n"; exit(EXIT_FAILURE); }
   if (pairing_file == "") { cerr << "missing pairing file\n"; exit(EXIT_FAILURE); }
   if (lib_file == "") { cerr << "missing lib file\n"; exit(EXIT_FAILURE); }
   if (ref_evidence_file == "") { cerr << "missing ref_evidence file\n"; exit(EXIT_FAILURE); }
@@ -74,11 +193,25 @@ main(int argc, char* argv[])
   {
     igzstream pairing_is(pairing_file);
     global::rg_set.load(pairing_is);
+    // check we have fragment rates
+    for_each(global::rg_set.rg_list.begin(), global::rg_set.rg_list.end(),
+	     [&] (const ReadGroup & rg) {
+	       if (rg.get_pairing()->frag_rate.size() == 0) {
+		 cerr << "missing fragment rate for read group "
+		      << strtk::join(",", rg.get_names()) << "\n";
+		 exit(EXIT_FAILURE);
+	       }
+	     });
   }
 
-  // load fasta file
+  // load ref fasta file
   {
-    igzstream fasta_is(fasta_file);
+    igzstream fasta_is(ref_fasta_file);
+    readFasta(fasta_is, global::refDict);
+  }
+  // load alt fasta file
+  {
+    igzstream fasta_is(alt_fasta_file);
     readFasta(fasta_is, global::refDict);
   }
 
@@ -102,6 +235,7 @@ main(int argc, char* argv[])
     if (not got_lib_line) break;
 
     // got one line from each file
+    process_locus(lib_line, ref_evidence_line, alt_evidence_line);
   }
 
   return EXIT_SUCCESS;
