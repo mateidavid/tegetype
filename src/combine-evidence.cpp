@@ -176,12 +176,12 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 				   alt_tsd[0][1] + global::flank_len);
     }
 
-  null_allele_present = (count[2] >= 2
+  null_allele_present = (count[2] >= 1
 			 or count[5] >= 5
 			 or double(count[5]) > .5 * e_null_cnt);
 
-  ins_allele_present = (count[0] >= 2
-			or count[1] >= 2
+  ins_allele_present = (count[0] >= 1
+			or count[1] >= 1
 			or count[3] >= 5
 			or count[4] >= 5
 			or double(count[3]) > .5 * e_ins_cnt[0]
