@@ -315,53 +315,59 @@ get_expected_complete_span(const SQDict & sq_dict, const ReadGroupSet & rg_set,
     cerr << "error: start=" << start_1 << " < end=" << end_1 << "\n";
     exit(EXIT_FAILURE);
   }
-  Contig& c = sq_dict[chr];
-  if (c.name.length() == 0) {
+  auto it = sq_dict.find(chr);
+  if (it == sq_dict.end()) {
+    cerr << "contig " << chr << " not found\n";
+    exit(EXIT_FAILURE);
+  }
+  const Contig& ctg = it->second;
+  if (ctg.name.length() == 0) {
     cerr << "error: couldn't find chr=" << chr << "\n";
     exit(EXIT_FAILURE);
-  } else if (start_1 > c.len) {
+  } else if (start_1 > ctg.len) {
     cerr << "error: start=" << start_1 << " outside chr=" << chr
-	 << " len=" << c.len << "\n";
+	 << " len=" << ctg.len << "\n";
     exit(EXIT_FAILURE);
-  } else if (end_1 > c.len) {
+  } else if (end_1 > ctg.len) {
     cerr << "error: end=" << end_1 << " outside chr=" << chr
-	 << " len=" << c.len << "\n";
+	 << " len=" << ctg.len << "\n";
     exit(EXIT_FAILURE);
   }
 
   double res = 0;
 
-  for_each(rg_set.rg_list.begin(), rg_set.rg_list.end(), [&] (const ReadGroup & rg) {
-      int rounded_mean = rg.get_pairing()->mean - (rg.get_pairing()->mean % 5);
+  for (size_t i = 0; i < rg_set.rg_list.size(); ++i) {
+    const ReadGroup & rg = rg_set.rg_list[i];
+    int rounded_mean = rg.get_pairing()->mean - (rg.get_pairing()->mean % 5);
 
-      // check if frags from this rg can fully span interval
-      if (end_1 - start_1 + 1 > rounded_mean) continue;
+    // check if frags from this rg can fully span interval
+    if (end_1 - start_1 + 1 > rounded_mean) continue;
 
-      long long reg_start_1 = end_1 - rounded_mean + 1;
-      long long reg_end_1 = start_1 + rounded_mean - 1;
+    long long reg_start_1 = max(1ll, end_1 - rounded_mean + 1);
+    long long reg_end_1 = min(start_1 + rounded_mean - 1, ctg.len);
 
-      int count_n = 0;
-      int count_gc = 0;
-      long long first_1 = reg_start_1;
-      long long last_1 = reg_start_1 - 1;
-      while (last_1 < reg_end_1) {
-	++last_1;
-	char c = c.seq[0][last_1 - 1];
-	if (c == 'N' or c == 'n') ++count_n;
-	if (c == 'G' or c == 'g' or c == 'C' or c == 'c') ++count_gc;
-	if (last_1 - first_1 + 1 > rounded_mean) {
-	  c = c.seq[0][first_1 - 1];
-	  if (c == 'N' or c == 'n') --count_n;
-	  if (c == 'G' or c == 'g' or c == 'C' or c == 'c') --count_gc;
-	  ++first_1;
-	}
-	if (last_1 - first_1 + 1 == rounded_mean) {
-	  // process current region
-	  int bin_idx = int((double(count_gc) / (rounded_mean + 1)) * 100);
-	  res += rg.get_pairing()->frag_rate[bin_idx];
-	}
+    int count_n = 0;
+    int count_gc = 0;
+    long long first_1 = reg_start_1;
+    long long last_1 = reg_start_1 - 1;
+    while (last_1 < reg_end_1) {
+      ++last_1;
+      char c = ctg.seq[0][last_1 - 1];
+      if (c == 'N' or c == 'n') ++count_n;
+      if (c == 'G' or c == 'g' or c == 'C' or c == 'c') ++count_gc;
+      if (last_1 - first_1 + 1 > rounded_mean) {
+	c = ctg.seq[0][first_1 - 1];
+	if (c == 'N' or c == 'n') --count_n;
+	if (c == 'G' or c == 'g' or c == 'C' or c == 'c') --count_gc;
+	++first_1;
       }
-    });
+      if (last_1 - first_1 + 1 == rounded_mean) {
+	// process current region
+	int bin_idx = int((double(count_gc) / (rounded_mean + 1)) * 100);
+	res += rg.get_pairing()->frag_rate[bin_idx];
+      }
+    }
+  }
 
   return res;
 }
