@@ -188,17 +188,17 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   if (null_allele_present and not ins_allele_present
       and count[0] == 0
       and count[1] == 0
-      and double(count[3]) < .25 * e_ins_cnt[0]
-      and double(count[4]) < .25 * e_ins_cnt[1]
-      and double(count[5]) > 1.5 * e_null_cnt)
+      and count[3] == 0
+      and count[4] == 0)
+    //and double(count[5]) > 1.5 * e_null_cnt)
     ins_allele_absent = true;
 
   // null allele absent?
   if (ins_allele_present and not null_allele_present
       and count[2] == 0
-      and double(count[5]) < .25 * e_null_cnt
-      and (double(count[3]) > 1.5 * e_ins_cnt[0]
-	   or double(count[4]) > 1.5 * e_ins_cnt[1]))
+      and count[5] == 0)
+    //and (double(count[3]) > 1.5 * e_ins_cnt[0]
+    //   or double(count[4]) > 1.5 * e_ins_cnt[1]))
     null_allele_absent = true;
 
   cout << locus_name << "\t" << (is_insertion? "I" : "D") << "\t";
