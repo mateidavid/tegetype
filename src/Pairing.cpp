@@ -311,8 +311,8 @@ double
 get_expected_complete_span(const SQDict & sq_dict, const ReadGroupSet & rg_set,
 			   const string & chr, long long start_1, long long end_1)
 {
-  if (start_1 < end_1) {
-    cerr << "error: start=" << start_1 << " < end=" << end_1 << "\n";
+  if (start_1 > end_1) {
+    cerr << "error: start=" << start_1 << " > end=" << end_1 << "\n";
     exit(EXIT_FAILURE);
   }
   auto it = sq_dict.find(chr);
