@@ -27,10 +27,10 @@ get_count_from_frag_list(const string & s)
   split(";", s, back_inserter(token_list[0]));
   for_each(token_list[0].begin(), token_list[0].end(), [&] (const std_string::token_list_type::value_type & t) {
       token_list[1].clear();
-      clog << "t=" << string(t.first, t.second) << "\n";
+      if (global::verbosity >= 3) clog << "t=" << string(t.first, t.second) << "\n";
       split(single_delimiter_predicate<std::string::value_type>(':'),
 	    t, back_inserter(token_list[1]));
-      clog << "token_list[1][0]=" << string(token_list[1].front().first, token_list[1].front().second) << "\n";
+      if (global::verbosity >= 3) clog << "token_list[1][0]=" << string(token_list[1].front().first, token_list[1].front().second) << "\n";
       if (token_list[1].size() != 2) {
 	cerr << "error parsing frag list: " << s << "\n";
 	exit(EXIT_FAILURE);
@@ -126,8 +126,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     count[5] = get_count_from_frag_list(s[3]);
   }
 
-  clog << locus_name << "\t" << count[0] << "\t" << count[1] << "\t" << count[2] << "\t"
-       << count[3] << "\t" << count[4] << "\t" << count[5] << "\t" << count[6] << "\n";
+  if (global::verbosity >= 2) clog << locus_name << "\t" << count[0] << "\t" << count[1] << "\t" << count[2] << "\t" << count[3] << "\t" << count[4] << "\t" << count[5] << "\t" << count[6] << "\n";
 
   // check presence of ins and null alleles
   bool have_ins_allele = false;
@@ -177,12 +176,12 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 				   alt_tsd[0][1] + global::flank_len);
     }
 
-  if (global::verbosity > 0)
+  if (global::verbosity >= 2)
     clog << "null allele test: have [" << count[5]
 	 << "] expect [" << e_null_cnt << "]\n";
   have_null_allele = (double(count[5]) > .5 * e_null_cnt);
 
-  if (global::verbosity > 0)
+  if (global::verbosity >= 2)
     clog << "ins allele test: 0: have [" << count[3] << "] expect [" << e_ins_cnt[0]
 	 << "] 1: have [" << count[4] << "] expect [" << e_ins_cnt[1] << "]\n";
   have_ins_allele = ((double(count[3]) > .5 * e_ins_cnt[0])
