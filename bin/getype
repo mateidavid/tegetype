@@ -321,11 +321,12 @@ run_stage
 #
 STAGE_NUM=9
 STAGE_NAME="Combine evidence"
-calls_csv=$ngs_name.$lib_name.calls.csv
+calls=$ngs_name.$lib_name.calls
 input_files=("$pairing_gc_rate_file" "$ref_evidence.csv" "$alt_evidence.csv")
-output_files=("$calls_csv")
+output_files=("$calls.csv")
 stage_command () {
-    combine-evidence -v -v -f "$ref_fa" -g "$lib_fa" -l "$pairing_gc_rate_file" \
-	-L "$lib_csv" -r "$ref_evidence.csv" -a "$alt_evidence.csv" >"$calls_csv"
+    combine-evidence -v -v -f "$ref_fa" -g "$lib_fa" -L "$lib_csv" \
+	-l "$pairing_gc_rate_file" -r "$ref_evidence.csv" -a "$alt_evidence.csv" \
+	>"$calls.csv" 2>"$calls.log"
 }
 run_stage
