@@ -328,3 +328,4 @@ stage_command () {
     combine-evidence -v -v -f "$ref_fa" -g "$lib_fa" -l "$pairing_gc_rate_file" \
 	-L "$lib_csv" -r "$ref_evidence.csv" -a "$alt_evidence.csv" >"$calls_csv"
 }
+run_stage
