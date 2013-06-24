@@ -182,8 +182,8 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 
   ins_allele_present = (count[0] >= 2
 			or count[1] >= 2
-			or count[0] >= 5
-			or count[1] >= 5
+			or count[3] >= 5
+			or count[4] >= 5
 			or double(count[3]) > .5 * e_ins_cnt[0]
 			or double(count[4]) > .5 * e_ins_cnt[1]);
 
