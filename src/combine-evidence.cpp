@@ -178,15 +178,16 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 				   alt_tsd[0][1] + global::flank_len);
     }
 
+  clog.unsetf(ios_base::floatfield);
   if (global::verbosity >= 2)
-    clog << "null allele test: have [" << count[5]
-	 << "] expect [" << e_null_cnt << "]\n";
+    clog << "null allele test: [" << count[5]
+	 << " vs " << e_null_cnt << "]\n";
   null_allele_present = (count[2] >= 2
 			 or double(count[5]) > .5 * e_null_cnt);
 
   if (global::verbosity >= 2)
-    clog << "ins allele test: 0: have [" << count[3] << "] expect [" << e_ins_cnt[0]
-	 << "] 1: have [" << count[4] << "] expect [" << e_ins_cnt[1] << "]\n";
+    clog << "ins allele test: 0: [" << count[3] << " vs " << e_ins_cnt[0]
+	 << "] 1: [" << count[4] << " vs " << e_ins_cnt[1] << "]\n";
   ins_allele_present = (count[0] >= 2
 			or count[1] >= 2
 			or double(count[3]) > .5 * e_ins_cnt[0]
