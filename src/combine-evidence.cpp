@@ -126,8 +126,6 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     count[5] = get_count_from_frag_list(s[3]);
   }
 
-  if (global::verbosity >= 2) clog << locus_name << "\t" << count[0] << "\t" << count[1] << "\t" << count[2] << "\t" << count[3] << "\t" << count[4] << "\t" << count[5] << "\t" << count[6] << "\n";
-
   // check allele presence
   bool ins_allele_present = false;
   bool null_allele_present = false;
@@ -212,24 +210,28 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 
   cout << locus_name << "\t" << (is_insertion? "I" : "D") << "\t";
 
+  string getype = "--";
   if (null_allele_present) {
-    cout << "N";
+    getype[0] = 'N';
     if (ins_allele_present)
-      cout << "I";
+      getype[1] = 'I';
     else if (ins_allele_absent)
-      cout << "N";
-    else
-      cout << "-";
+      getype[1] = 'N';
   } else if (ins_allele_present) {
-    cout << "I";
+    getype[0] = 'I';
     if (null_allele_absent)
-      cout << "I";
-    else
-      cout << "-";
-  } else {
-    cout << "--";
+      getype[1] = 'I';
   }
-  cout << "\n";
+  cout << getype << "\n";
+
+  if (global::verbosity >= 2)
+    clog << locus_name << "\t" << (is_insertion? "I" : "D") << "\t"
+	 << count[0] << "\t" << count[1] << "\t" << count[2] << "\t"
+	 << count[3] << "/" << e_ins_cnt[0] << "\t"
+	 << count[4] << "/" << e_ins_cnt[1] << "\t"
+	 << count[5] << "/" << e_null_cnt << "\t"
+	 << count[6] << "\n";
+    
 }
 
 
