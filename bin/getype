@@ -139,25 +139,25 @@ pairing_file=$ngs_name.$ref_name.pairing
 input_files=("${orig_mappings[@]}")
 output_files=("$pairing_file")
 stage_command () {
-    rm -f $pairing_file.tmp
+    rm -f "$pairing_file.tmp"
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
-	no_sigpipe get_mappings_by_read_name $i | detect-pairing -f >>$pairing_file.tmp
+	no_sigpipe get_mappings_by_read_name $i | detect-pairing -f >>"$pairing_file.tmp"
 	let i+=1
     done
-    sed 's/\(^.*stddev=\([0-9]*\),.*$\)/\1\t\2/' <$pairing_file.tmp |
+    sed 's/\(^.*stddev=\([0-9]*\),.*$\)/\1\t\2/' <"$pairing_file.tmp" |
     sort -s -k 1,1 -k 4,4n |
     cut -f 1-3 |
-    tawk 'BEGIN{last=""} {if ($1!=last) print; last=$1}' >$pairing_file.tmp.uniq
-    tawk -v n=$(wc -l <$pairing_file.tmp.uniq) \
+    tawk 'BEGIN{last=""} {if ($1!=last) print; last=$1}' >"$pairing_file.tmp.uniq"
+    tawk -v n=$(wc -l <"$pairing_file.tmp.uniq") \
 	'{$2=NR-1; while (length($2)<length(n-1)) $2="0" $2; print}' \
-	<$pairing_file.tmp.uniq >$pairing_file
+	<"$pairing_file.tmp.uniq" >"$pairing_file"
 }
 run_stage
 
-grep -q "paired=" $pairing_file || crash "could not determine pairing information"
-rg_id=($(sort -s -k 2,2n $pairing_file | cut -f 2))
-rg_string=($(sort -s -k 2,2n $pairing_file | cut -f 1))
+grep -q "paired=" "$pairing_file" || crash "could not determine pairing information"
+rg_id=($(sort -s -k 2,2n "$pairing_file" | cut -f 2))
+rg_string=($(sort -s -k 2,2n "$pairing_file" | cut -f 1))
 
 
 #
@@ -175,18 +175,18 @@ stage_command () {
     i=0
     while [ $i -lt ${#orig_mappings[@]} ]; do
 	add_dummy_pairs=1 get_mappings_by_read_name $i |
-	add-extra-sam-flags -N 4 -l $pairing_file |
-	filter-concordant -N 4 -l $pairing_file 3>&1 >/dev/null |
-	sam-to-fq -s -l $pairing_file
+	add-extra-sam-flags -N 4 -l "$pairing_file" |
+	filter-concordant -N 4 -l "$pairing_file" 3>&1 >/dev/null |
+	sam-to-fq -s -l "$pairing_file"
 	let i+=1
     done |
     fq-trim-illumina-reads -v input_phred=33 |
     fq-remove-short-paired-reads |
     fq-rename-paired-reads-with-len -v ofq=tfq |
     tawk '{split($1,a,":"); print a[1] "." a[3], $0;}' |
-    split-file-by-field -r --prefix $reads_to_remap. --suffix .fq.gz \
+    split-file-by-field -r --prefix "$reads_to_remap." --suffix .fq.gz \
 	--cmd "fq-convert -v ofq=fq | gzip -9" \
-	-d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <$pairing_file)
+	-d <(tawk '{print $2 ".1", $1 ".1"; print $2 ".2", $1 ".2";}' <"$pairing_file")
 }
 run_stage
 
@@ -205,13 +205,13 @@ output_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; d
 stage_command () {
     while read -r -a line; do
 	make_note "remapping read group [${line[0]}]"
-	$PV $reads_to_remap.${line[0]}.1.fq.gz | zc |
+	$PV "$reads_to_remap.${line[0]}.1.fq.gz" | zc |
 	bowtie2 -x $lib_bt2_idx -p $NCPU --phred33 --quiet \
 	    -1 - \
-	    -2 <(zc $reads_to_remap.${line[0]}.2.fq.gz) \
+	    -2 <(zc "$reads_to_remap.${line[0]}.2.fq.gz") \
 	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} --rg "SM:$ngs_name" |
-	samtools view -Sb - >$mappings_to_alt.${line[0]}.bam
-    done <$pairing_file
+	samtools view -Sb - >"$mappings_to_alt.${line[0]}.bam"
+    done <"$pairing_file"
 }
 run_stage
 
@@ -229,8 +229,8 @@ input_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; do
 output_files=("$mappings_to_alt_sort.bam")
 stage_command () {
     samtools merge -u -h <(bam-merge-rg-headers "${input_files[@]}") - "${input_files[@]}" |
-    samtools sort -m 10000000000 - $mappings_to_alt_sort
-    samtools index $mappings_to_alt_sort.bam
+    samtools sort -m 10000000000 - "$mappings_to_alt_sort"
+    samtools index "$mappings_to_alt_sort.bam"
 }
 run_stage
 
@@ -248,28 +248,28 @@ stage_command () {
     while read -r -a line; do
 	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a $ref_evidence.log >&2
 	{
-	    for f in ${orig_mappings[@]}; do
+	    for f in "${orig_mappings[@]}"; do
 		local_chr_name=$(tawk "\$1==\"${line[1]}\"" \
-		    <$(basename $f).chr_map | cut -f 2)
+		    <$(basename "$f").chr_map | cut -f 2)
 		[ "$local_chr_name" ] || continue
-		samtools view $f \
+		samtools view "$f" \
 		    $local_chr_name:$((${line[2]} + 1))-${line[3]}
 	    done
-	    samtools view $mappings_to_alt_sort.bam \
+	    samtools view "$mappings_to_alt_sort.bam" \
 		${line[1]}:$((${line[2]} + 1))-${line[3]} |
 	    # return to original name to mix with original mappings
 	    tawk '{n=split($1,a,":"); $1=a[2]":"a[8]; for(i=9;i<=n;i++) $1=":"a[i]; print}'
 	} |
-	sam-filter-nm 3>>$ref_evidence.log |
+	sam-filter-nm 3>>"$ref_evidence.log" |
 	add-dummy-pairs |
 	sam-rsort 2> >(grep -v "some paired reads" >&2 || true) |
-	add-extra-sam-flags -N 4 -l $pairing_file |
-	filter-concordant -N 4 -l $pairing_file 3>/dev/null |
-	get-te-evidence -l $pairing_file -q $MIN_MQV -v \
+	add-extra-sam-flags -N 4 -l "$pairing_file" |
+	filter-concordant -N 4 -l "$pairing_file" 3>/dev/null |
+	get-te-evidence -l "$pairing_file" -q $MIN_MQV -v \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
 	    -s $((${line[2]} + 1)),${line[3]} \
-	    >>$ref_evidence.csv 2>>$ref_evidence.log
-    done <$lib_csv
+	    >>"$ref_evidence.csv" 2>>"$ref_evidence.log"
+    done <"$lib_csv"
 }
 run_stage
 
@@ -283,21 +283,21 @@ alt_evidence=$ngs_name.$lib_name.alt-evidence
 input_files=("$mappings_to_alt_sort.bam")
 output_files=("$alt_evidence.csv")
 stage_command () {
-    rm -f $alt_evidence.csv $alt_evidence.log
+    rm -f "$alt_evidence.csv" "$alt_evidence.log"
     while read -r -a line; do
-	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a $alt_evidence.log >&2
-	samtools view $mappings_to_alt_sort.bam \
+	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a "$alt_evidence.log" >&2
+	samtools view "$mappings_to_alt_sort.bam" \
 	    ${line[8]}:$((${line[9]} + 1))-${line[10]} |
-	sam-filter-nm 3>>$alt_evidence.log |
+	sam-filter-nm 3>>"$alt_evidence.log" |
 	sam-rsort --cid-parser cid_parser \
 	    2> >(grep -v "some paired reads" >&2 || true) |
-	add-extra-sam-flags -N 4 -P -l $pairing_file |
-	filter-concordant -N 4 -P -l $pairing_file 3>/dev/null |
-	get-te-evidence -P -l $pairing_file -q $MIN_MQV -v \
+	add-extra-sam-flags -N 4 -P -l "$pairing_file" |
+	filter-concordant -N 4 -P -l "$pairing_file" 3>/dev/null |
+	get-te-evidence -P -l "$pairing_file" -q $MIN_MQV -v \
 	    -t ${line[11]},${line[12]} -t ${line[13]},${line[14]} \
 	    -s $((${line[9]} + 1)),${line[10]} \
-	    >>$alt_evidence.csv 2>>$alt_evidence.log
-    done <$lib_csv
+	    >>"$alt_evidence.csv" 2>>"$alt_evidence.log"
+    done <"$lib_csv"
 }
 run_stage
 
@@ -314,3 +314,17 @@ stage_command () {
     START_STAGE=1 END_STAGE=100 ORIG_MAPPINGS=$(quote "${orig_mappings[@]}") get-frag-rates $ngs_name $ref_name
 }
 run_stage
+
+
+#
+# Stage 9: Combine evidence
+#
+STAGE_NUM=9
+STAGE_NAME="Combine evidence"
+calls_csv=$ngs_name.$lib_name.calls.csv
+input_files=("$pairing_gc_rate_file" "$ref_evidence.csv" "$alt_evidence.csv")
+output_files=("$calls_csv")
+stage_command () {
+    combine-evidence -v -v -f "$ref_fa" -g "$lib_fa" -l "$pairing_gc_rate_file" \
+	-L "$lib_csv" -r "$ref_evidence.csv" -a "$alt_evidence.csv" >"$calls_csv"
+}
