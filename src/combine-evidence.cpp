@@ -12,6 +12,11 @@ using namespace std;
 string prog_name;
 
 
+namespace global {
+  int flank_len = 20;
+}
+
+
 int
 get_count_from_frag_list(const string & s)
 {
@@ -48,8 +53,8 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   string s[4];
   string ref_chr;
   string alt_chr;
-  long long ref_tsd[2][2];
-  long long alt_tsd[2][2];
+  long long ref_tsd[2][2] = {{0, 0}, {0, 0}};
+  long long alt_tsd[2][2] = {{0, 0}, {0, 0}};
   bool is_insertion;
 
   // parse lib line
@@ -123,6 +128,66 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 
   clog << locus_name << "\t" << count[0] << "\t" << count[1] << "\t" << count[2] << "\t"
        << count[3] << "\t" << count[4] << "\t" << count[5] << "\t" << count[6] << "\n";
+
+  // check presence of ins and null alleles
+  bool have_ins_allele = false;
+  bool have_null_allele = false;
+  double e_null_cnt;
+  double e_ins_cnt[2];
+  if (is_insertion)
+    {
+      // null allele is ref
+      e_null_cnt =
+	get_expected_complete_span(global::refDict, global::rg_set,
+				   ref_chr,
+				   ref_tsd[0][0] + 1 - global::flank_len,
+				   ref_tsd[0][1] + global::flank_len);
+
+      // ins allele is alt
+      e_ins_cnt[0] =
+	get_expected_complete_span(global::refDict, global::rg_set,
+				   alt_chr,
+				   alt_tsd[0][0] + 1 - global::flank_len,
+				   alt_tsd[0][1] + global::flank_len);
+      e_ins_cnt[1] =
+	get_expected_complete_span(global::refDict, global::rg_set,
+				   alt_chr,
+				   alt_tsd[1][0] + 1 - global::flank_len,
+				   alt_tsd[1][1] + global::flank_len);
+    }
+  else // deletion
+    {
+      // ins allele is ref
+      e_ins_cnt[0] =
+	get_expected_complete_span(global::refDict, global::rg_set,
+				   ref_chr,
+				   ref_tsd[0][0] + 1 - global::flank_len,
+				   ref_tsd[0][1] + global::flank_len);
+      e_ins_cnt[1] =
+	get_expected_complete_span(global::refDict, global::rg_set,
+				   ref_chr,
+				   ref_tsd[1][0] + 1 - global::flank_len,
+				   ref_tsd[1][1] + global::flank_len);
+
+      // null allele is alt
+      e_null_cnt =
+	get_expected_complete_span(global::refDict, global::rg_set,
+				   alt_chr,
+				   alt_tsd[0][0] + 1 - global::flank_len,
+				   alt_tsd[0][1] + global::flank_len);
+    }
+
+  if (global::verbosity > 0)
+    clog << "null allele test: have [" << count[5]
+	 << "] expect [" << e_null_cnt << "]\n";
+  have_null_allele = (double(count[5]) > .5 * e_null_cnt);
+
+  if (global::verbosity > 0)
+    clog << "ins allele test: 0: have [" << count[3] << "] expect [" << e_ins_cnt[0]
+	 << "] 1: have [" << count[4] << "] expect [" << e_ins_cnt[1] << "]\n";
+  have_ins_allele = ((double(count[3]) > .5 * e_ins_cnt[0])
+		     or (double(count[4]) > .5 * e_ins_cnt[1]));
+
 }
 
 
