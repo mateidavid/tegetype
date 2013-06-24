@@ -225,7 +225,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   cout << getype << "\n";
 
   if (global::verbosity >= 2)
-    clog << locus_name << "\t" << (is_insertion? "I" : "D") << "\t"
+    clog << locus_name << "\t" << (is_insertion? "I" : "D") << "\t" << getype << "\t"
 	 << count[0] << "\t" << count[1] << "\t" << count[2] << "\t"
 	 << count[3] << "/" << e_ins_cnt[0] << "\t"
 	 << count[4] << "/" << e_ins_cnt[1] << "\t"
