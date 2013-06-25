@@ -14,6 +14,18 @@ string prog_name;
 
 namespace global {
   int flank_len = 20;
+  bool is_male = true;
+}
+
+
+int
+get_chr_count(const string & chr)
+{
+  if (chr == "chrX")
+    return global::is_male? 1 : 2;
+  else if (chr == "chrY")
+    return global::is_male? 1 : 0;
+  else return 2;
 }
 
 
@@ -176,19 +188,26 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 				   alt_tsd[0][1] + global::flank_len);
     }
 
-  null_allele_present = (count[2] >= 1
-			 or count[5] >= 5
-			 or double(count[5]) > .5 * e_null_cnt);
+  int chr_count = get_chr_count(ref_chr);
+  null_allele_present = (chr_count >= 1) and (count[2] >= 1
+					      or count[5] >= 5
+					      or double(count[5]) > .5 * e_null_cnt);
 
-  ins_allele_present = (count[0] >= 1
-			or count[1] >= 1
-			or count[3] >= 5
-			or count[4] >= 5
-			or double(count[3]) > .5 * e_ins_cnt[0]
-			or double(count[4]) > .5 * e_ins_cnt[1]);
+  ins_allele_present = (chr_count >= 1) and (count[0] >= 1
+					     or count[1] >= 1
+					     or count[3] >= 5
+					     or count[4] >= 5
+					     or double(count[3]) > .5 * e_ins_cnt[0]
+					     or double(count[4]) > .5 * e_ins_cnt[1]);
+
+  if (chr_count == 1 and null_allele_present and ins_allele_present) {
+    // cannot both be present, don't make a call
+    null_allele_present = false;
+    ins_allele_present = false;
+  }
 
   // ins allele absent?
-  if (null_allele_present and not ins_allele_present
+  if (chr_count == 2 and null_allele_present and not ins_allele_present
       and count[0] == 0
       and count[1] == 0
       and count[3] == 0
@@ -197,7 +216,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     ins_allele_absent = true;
 
   // null allele absent?
-  if (ins_allele_present and not null_allele_present
+  if (chr_count == 2 and ins_allele_present and not null_allele_present
       and count[2] == 0
       and count[5] == 0)
     //and (double(count[3]) > 1.5 * e_ins_cnt[0]
@@ -206,29 +225,42 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 
   cout << locus_name << "\t" << (is_insertion? "I" : "D") << "\t";
 
-  string getype = "--";
-  if (null_allele_present) {
-    getype[0] = 'N';
-    if (ins_allele_present)
-      getype[1] = 'I';
-    else if (ins_allele_absent)
-      getype[1] = 'N';
-  } else if (ins_allele_present) {
-    getype[0] = 'I';
-    if (null_allele_absent)
-      getype[1] = 'I';
-  }
-  cout << getype << "\n";
+  char null_allele_name = is_insertion? 'R' : 'A';
+  char ins_allele_name = is_insertion? 'A' : 'R';
+  string getype_abs = (chr_count == 2? "--": (chr_count == 1? "-X" : "XX"));
+  string getype_rel = (chr_count == 2? "--": (chr_count == 1? "-X" : "XX"));
 
-  clog.unsetf(ios_base::floatfield);
-  if (global::verbosity >= 2)
-    clog << locus_name << "\t" << (is_insertion? "I" : "D") << "\t" << getype << "\t"
+  if (null_allele_present) {
+    getype_abs[0] = 'N';
+    getype_rel[0] = null_allele_name;
+    if (ins_allele_present) {
+      getype_abs[1] = 'I';
+      getype_rel[1] = ins_allele_name;
+    } else if (ins_allele_absent) {
+      getype_abs[1] = 'N';
+      getype_rel[1] = null_allele_name;
+    }
+  } else if (ins_allele_present) {
+    getype_abs[0] = 'I';
+    getype_rel[0] = ins_allele_name;
+    if (null_allele_absent) {
+      getype_abs[1] = 'I';
+      getype_rel[1] = ins_allele_name;
+    }
+  }
+  if (getype_rel == "AR") getype_rel = "RA";
+  cout << getype_abs << "\t" << getype_rel << "\n";
+
+  if (global::verbosity >= 2) {
+    clog.unsetf(ios_base::floatfield);
+    clog << locus_name << "\t" << (is_insertion? "I" : "D")
+	 << "\t" << getype_abs << "\t" << getype_rel << "\t"
 	 << count[0] << "\t" << count[1] << "\t" << count[2] << "\t"
 	 << count[3] << "/" << e_ins_cnt[0] << "\t"
 	 << count[4] << "/" << e_ins_cnt[1] << "\t"
 	 << count[5] << "/" << e_null_cnt << "\t"
 	 << count[6] << "\n";
-    
+  }
 }
 
 
@@ -243,6 +275,11 @@ int
 main(int argc, char* argv[])
 {
   prog_name = argv[0];
+  {
+    char * p = getenv("GENDER");
+    if (p != NULL and *p == 'f') global::is_male = false;
+  }
+
   string ref_fasta_file;
   string alt_fasta_file;
   string pairing_file;
@@ -251,7 +288,7 @@ main(int argc, char* argv[])
   string alt_evidence_file;
 
   char c;
-  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:h")) != -1) {
+  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:x:h")) != -1) {
     switch (c) {
     case 'v':
       global::verbosity++;
@@ -277,6 +314,15 @@ main(int argc, char* argv[])
     case 'h':
       usage(cout);
       exit(EXIT_SUCCESS);
+    case 'x':
+      if (optarg[0] == 'm') {
+	global::is_male = true;
+      } else if (optarg[0] == 'f') {
+	global::is_male = false;
+      } else {
+	cerr << "unrecognized gender: " << optarg << "\n";
+	exit(EXIT_FAILURE);
+      }
     default:
       cerr << "unrecognized option: " << c << "\n";
       usage(cerr);
@@ -294,6 +340,10 @@ main(int argc, char* argv[])
   if (lib_file == "") { cerr << "missing lib file\n"; exit(EXIT_FAILURE); }
   if (ref_evidence_file == "") { cerr << "missing ref_evidence file\n"; exit(EXIT_FAILURE); }
   if (alt_evidence_file == "") { cerr << "missing alt_evidence file\n"; exit(EXIT_FAILURE); }
+
+  if (global::verbosity >= 1) {
+    clog << "gender: " << (global::is_male? "m" : "f") << "\n";
+  }
 
   // load pairing file
   {
