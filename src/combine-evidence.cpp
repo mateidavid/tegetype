@@ -189,13 +189,15 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     }
 
   int chr_count = get_chr_count(ref_chr);
-  null_allele_present = (chr_count >= 1) and (count[2] >= 1
-					      or count[5] >= 5
+  null_allele_present = (chr_count >= 1) and (//count[2] >= 1
+					      //or
+					      count[5] >= 5
 					      or double(count[5]) > .5 * e_null_cnt);
 
-  ins_allele_present = (chr_count >= 1) and (count[0] >= 1
-					     or count[1] >= 1
-					     or count[3] >= 5
+  ins_allele_present = (chr_count >= 1) and (//count[0] >= 1
+					     //or count[1] >= 1
+					     //or
+					     count[3] >= 5
 					     or count[4] >= 5
 					     or double(count[3]) > .5 * e_ins_cnt[0]
 					     or double(count[4]) > .5 * e_ins_cnt[1]);
@@ -211,16 +213,16 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
       and count[0] == 0
       and count[1] == 0
       and count[3] == 0
-      and count[4] == 0)
-    //and double(count[5]) > 1.5 * e_null_cnt)
+      and count[4] == 0
+      and double(count[5]) > 1.5 * e_null_cnt)
     ins_allele_absent = true;
 
   // null allele absent?
   if (chr_count == 2 and ins_allele_present and not null_allele_present
       and count[2] == 0
-      and count[5] == 0)
-    //and (double(count[3]) > 1.5 * e_ins_cnt[0]
-    //   or double(count[4]) > 1.5 * e_ins_cnt[1]))
+      and count[5] == 0
+      and (double(count[3]) > 1.5 * e_ins_cnt[0]
+	   or double(count[4]) > 1.5 * e_ins_cnt[1]))
     null_allele_absent = true;
 
   cout << locus_name << "\t" << (is_insertion? "I" : "D") << "\t";
