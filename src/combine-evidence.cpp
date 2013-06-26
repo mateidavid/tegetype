@@ -208,6 +208,15 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     ins_allele_present = false;
   }
 
+  bool more_than_2 = false;
+  // check for evidence of more than 2 alleles
+  if (null_allele_present and ins_allele_present
+      and (double(count[5]) > 1.5 * e_null_cnt
+	   or double(count[3]) > 1.5 * e_ins_cnt[0]
+	   or double(count[4]) > 1.5 * e_ins_cnt[1])) {
+    more_than_2 = true;
+  }
+
   // ins allele absent?
   if (chr_count == 2 and null_allele_present and not ins_allele_present
       and count[0] == 0
@@ -251,6 +260,12 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     }
   }
   if (getype_rel == "AR") getype_rel = "RA";
+
+  if (more_than_2) {
+    getype_abs += "+";
+    getype_rel += "+";
+  }
+
   cout << getype_abs << "\t" << getype_rel << "\n";
 
   if (global::verbosity >= 2) {
