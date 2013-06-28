@@ -67,40 +67,47 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   string alt_chr;
   long long ref_tsd[2][2] = {{0, 0}, {0, 0}};
   long long alt_tsd[2][2] = {{0, 0}, {0, 0}};
+  int ref_strand;
   bool is_insertion;
+  bool solid_bp[2];
 
   // parse lib line
   strtk::std_string::token_list_type token_list;
   strtk::split("\t", lib_line, back_inserter(token_list));
-  if (token_list.size() < 15) {
+  if (token_list.size() < 17) {
     cerr << "could not parse lib line: " << lib_line << "\n";
     exit(EXIT_FAILURE);
   }
-  auto itr = token_list.begin();
+  auto itr = token_list.begin(); // name
   locus_name = string(itr->first, itr->second);
-  ++itr;
+  ++itr; // ref_chr
   ref_chr = string(itr->first, itr->second);
-  ++itr;
-  ++itr;
-  ++itr;
+  ++itr; // ref_reg_start
+  ++itr; // ref_reg_end
+  ++itr; // ref_tsd0_start
   ref_tsd[0][0] = atoll(itr->first);
-  ++itr;
+  ++itr; // ref_tsd0_end
   ref_tsd[0][1] = atoll(itr->first);
-  ++itr;
+  ++itr; // ref_tsd1_start
   s[0] = string(itr->first, itr->second);
-  ++itr;
+  ++itr; // ref_tsd1_end
   s[1] = string(itr->first, itr->second);
-  ++itr;
+  ++itr; // strand
+  ref_strand = (*(itr->first) == '+'? 0 : 1);
+  ++itr; // bp_coverage
+  solid_bp[0] = (*(itr->first) == '1');
+  solid_bp[1] = (*(itr->first + 1) == '1');
+  ++itr; // alt_chr
   alt_chr = string(itr->first, itr->second);
-  ++itr;
-  ++itr;
-  ++itr;
+  ++itr; // alt_reg_start
+  ++itr; // alt_reg_end
+  ++itr; // alt_tsd0_start
   alt_tsd[0][0] = atoll(itr->first);
-  ++itr;
+  ++itr; // alt_tsd0_end
   alt_tsd[0][1] = atoll(itr->first);
-  ++itr;
+  ++itr; // alt_tsd1_start
   s[2] = string(itr->first, itr->second);
-  ++itr;
+  ++itr; // alt_tsd1_end
   s[3] = string(itr->first, itr->second);
 
   if (s[0] == ".") {
@@ -189,18 +196,19 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     }
 
   int chr_count = get_chr_count(ref_chr);
-  null_allele_present = (chr_count >= 1) and (//count[2] >= 1
-					      //or
-					      count[5] >= 5
-					      or double(count[5]) > .5 * e_null_cnt);
+  null_allele_present = (chr_count >= 1
+			 and (count[5] >= 5
+			      or double(count[5]) > max(2.0, .5 * e_null_cnt)
+			      )
+			 );
 
-  ins_allele_present = (chr_count >= 1) and (//count[0] >= 1
-					     //or count[1] >= 1
-					     //or
-					     count[3] >= 5
-					     or count[4] >= 5
-					     or double(count[3]) > .5 * e_ins_cnt[0]
-					     or double(count[4]) > .5 * e_ins_cnt[1]);
+  ins_allele_present = (chr_count >= 1
+			and ((count[3 + ref_strand] >= 5
+			      or double(count[3 + ref_strand])
+			      > max(2.0, .5 * e_ins_cnt[0 + ref_strand])
+			      )
+			     )
+			);
 
   if (chr_count == 1 and null_allele_present and ins_allele_present) {
     // cannot both be present, don't make a call
@@ -212,8 +220,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   // check for evidence of more than 2 alleles
   if (null_allele_present and ins_allele_present
       and (double(count[5]) > 1.5 * e_null_cnt
-	   or double(count[3]) > 1.5 * e_ins_cnt[0]
-	   or double(count[4]) > 1.5 * e_ins_cnt[1])) {
+	   or double(count[3 + ref_strand]) > 1.5 * e_ins_cnt[0 + ref_strand])) {
     more_than_2 = true;
   }
 
@@ -230,8 +237,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   if (chr_count == 2 and ins_allele_present and not null_allele_present
       and count[2] == 0
       and count[5] == 0
-      and (double(count[3]) > 1.5 * e_ins_cnt[0]
-	   or double(count[4]) > 1.5 * e_ins_cnt[1]))
+      and double(count[3 + ref_strand]) > 1.5 * e_ins_cnt[0 + ref_strand])
     null_allele_absent = true;
 
   cout << locus_name << "\t" << (is_insertion? "I" : "D") << "\t";

@@ -79,7 +79,7 @@ END_STAGE=${END_STAGE:-100}
 make_note "using START_STAGE=$START_STAGE and END_STAGE=$END_STAGE"
 export MAX_NM=${MAX_NM:-20}
 make_note "using MAX_NM=$MAX_NM"
-export MIN_MQV=${MIN_MQV:-0}
+export MIN_MQV=${MIN_MQV:-10}
 make_note "using MIN_MQV=$MIN_MQV"
 
 
@@ -246,7 +246,7 @@ output_files=("$ref_evidence.csv")
 stage_command () {
     rm -f $ref_evidence.csv $ref_evidence.log
     while read -r -a line; do
-	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a $ref_evidence.log >&2
+	make_note "processing: ${line[@]}" 2>&1 | tee -a $ref_evidence.log >&2
 	{
 	    for f in "${orig_mappings[@]}"; do
 		local_chr_name=$(tawk "\$1==\"${line[1]}\"" \
@@ -285,17 +285,17 @@ output_files=("$alt_evidence.csv")
 stage_command () {
     rm -f "$alt_evidence.csv" "$alt_evidence.log"
     while read -r -a line; do
-	make_note "processing: ${line[@]:0:15}" 2>&1 | tee -a "$alt_evidence.log" >&2
+	make_note "processing: ${line[@]}" 2>&1 | tee -a "$alt_evidence.log" >&2
 	samtools view "$mappings_to_alt_sort.bam" \
-	    ${line[8]}:$((${line[9]} + 1))-${line[10]} |
+	    ${line[10]}:$((${line[11]} + 1))-${line[12]} |
 	sam-filter-nm 3>>"$alt_evidence.log" |
 	sam-rsort --cid-parser cid_parser \
 	    2> >(grep -v "some paired reads" >&2 || true) |
 	add-extra-sam-flags -N 4 -P -l "$pairing_file" |
 	filter-concordant -N 4 -P -l "$pairing_file" 3>/dev/null |
 	get-te-evidence -P -l "$pairing_file" -q $MIN_MQV -v \
-	    -t ${line[11]},${line[12]} -t ${line[13]},${line[14]} \
-	    -s $((${line[9]} + 1)),${line[10]} \
+	    -t ${line[13]},${line[14]} -t ${line[15]},${line[16]} \
+	    -s $((${line[11]} + 1)),${line[12]} \
 	    >>"$alt_evidence.csv" 2>>"$alt_evidence.log"
     done <"$lib_csv"
 }
