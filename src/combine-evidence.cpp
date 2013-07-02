@@ -15,6 +15,7 @@ string prog_name;
 namespace global {
   int flank_len = 20;
   bool is_male = true;
+  bool check_tail_if_head_not_solid = false;
 }
 
 
@@ -68,6 +69,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   long long ref_tsd[2][2] = {{0, 0}, {0, 0}};
   long long alt_tsd[2][2] = {{0, 0}, {0, 0}};
   int ref_strand;
+  int tsd_to_check;
   bool is_insertion;
   bool solid_bp[2];
 
@@ -119,9 +121,21 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
     ref_tsd[1][0] = atoll(s[0].c_str());
     ref_tsd[1][1] = atoll(s[1].c_str());
   }
+  tsd_to_check = ref_strand;
+  if (global::check_tail_if_head_not_solid
+      and solid_bp[tsd_to_check] == false and solid_bp[1 - tsd_to_check] == true)
+    tsd_to_check = 1 - tsd_to_check;
 
   int count[7];
   // parse ref_evidence & alt_evidence lines
+  //
+  // count structure:
+  //    --------6--------
+  //    ---3---   ---4---
+  // ins  -0- ===== -1-
+  // ====               ====
+  // null      -2-
+  //    --------5--------
   if (is_insertion) {
     if (not strtk::parse(ref_evidence_line, "\t", count[2], s[0])
 	or not strtk::parse(alt_evidence_line, "\t", count[0], count[1],
@@ -203,9 +217,9 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 			 );
 
   ins_allele_present = (chr_count >= 1
-			and ((count[3 + ref_strand] >= 5
-			      or double(count[3 + ref_strand])
-			      > max(2.0, .5 * e_ins_cnt[0 + ref_strand])
+			and ((count[3 + tsd_to_check] >= 5
+			      or double(count[3 + tsd_to_check])
+			      > max(2.0, .5 * e_ins_cnt[0 + tsd_to_check])
 			      )
 			     )
 			);
@@ -220,7 +234,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   // check for evidence of more than 2 alleles
   if (null_allele_present and ins_allele_present
       and (double(count[5]) > 1.5 * e_null_cnt
-	   or double(count[3 + ref_strand]) > 1.5 * e_ins_cnt[0 + ref_strand])) {
+	   or double(count[3 + tsd_to_check]) > 1.5 * e_ins_cnt[0 + tsd_to_check])) {
     more_than_2 = true;
   }
 
@@ -237,7 +251,7 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   if (chr_count == 2 and ins_allele_present and not null_allele_present
       and count[2] == 0
       and count[5] == 0
-      and double(count[3 + ref_strand]) > 1.5 * e_ins_cnt[0 + ref_strand])
+      and double(count[3 + tsd_to_check]) > 1.5 * e_ins_cnt[0 + tsd_to_check])
     null_allele_absent = true;
 
   cout << locus_name << "\t" << (is_insertion? "I" : "D") << "\t";
@@ -311,7 +325,7 @@ main(int argc, char* argv[])
   string alt_evidence_file;
 
   char c;
-  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:x:h")) != -1) {
+  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:x:th")) != -1) {
     switch (c) {
     case 'v':
       global::verbosity++;
@@ -334,6 +348,8 @@ main(int argc, char* argv[])
     case 'a':
       alt_evidence_file = optarg;
       break;
+    case 't':
+      global::check_tail_if_head_not_solid = true;
     case 'h':
       usage(cout);
       exit(EXIT_SUCCESS);
