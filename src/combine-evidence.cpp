@@ -211,14 +211,14 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 
   int chr_count = get_chr_count(ref_chr);
   null_allele_present = (chr_count >= 1
-			 and (count[5] >= 5
-			      or double(count[5]) > max(2.0, .5 * e_null_cnt)
+			 and (//count[5] >= 5 or
+			      double(count[5]) > max(2.0, .5 * e_null_cnt)
 			      )
 			 );
 
   ins_allele_present = (chr_count >= 1
-			and ((count[3 + tsd_to_check] >= 5
-			      or double(count[3 + tsd_to_check])
+			and ((//count[3 + tsd_to_check] >= 5 or
+			      double(count[3 + tsd_to_check])
 			      > max(2.0, .5 * e_ins_cnt[0 + tsd_to_check])
 			      )
 			     )
