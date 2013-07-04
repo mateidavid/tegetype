@@ -79,6 +79,8 @@ END_STAGE=${END_STAGE:-100}
 make_note "using START_STAGE=$START_STAGE and END_STAGE=$END_STAGE"
 export MAX_NM=${MAX_NM:-20}
 make_note "using MAX_NM=$MAX_NM"
+export MIN_READ_LEN=${MIN_READ_LEN:-20}
+make_note "using MIN_READ_LEN=$MIN_READ_LEN"
 export MIN_MQV=${MIN_MQV:-10}
 make_note "using MIN_MQV=$MIN_MQV"
 
@@ -265,7 +267,7 @@ stage_command () {
 	sam-rsort 2> >(grep -v "some paired reads" >&2 || true) |
 	add-extra-sam-flags -N 4 -l "$pairing_file" |
 	filter-concordant -N 4 -l "$pairing_file" 3>/dev/null |
-	get-te-evidence -l "$pairing_file" -q $MIN_MQV -v \
+	get-te-evidence -l "$pairing_file" -q $MIN_MQV -n $MAX_NM -r $MIN_READ_LEN -v \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
 	    -s $((${line[2]} + 1)),${line[3]} \
 	    >>"$ref_evidence.csv" 2>>"$ref_evidence.log"
@@ -293,7 +295,7 @@ stage_command () {
 	    2> >(grep -v "some paired reads" >&2 || true) |
 	add-extra-sam-flags -N 4 -P -l "$pairing_file" |
 	filter-concordant -N 4 -P -l "$pairing_file" 3>/dev/null |
-	get-te-evidence -P -l "$pairing_file" -q $MIN_MQV -v \
+	get-te-evidence -P -l "$pairing_file" -q $MIN_MQV -n $MAX_NM -r $MIN_READ_LEN -v \
 	    -t ${line[13]},${line[14]} -t ${line[15]},${line[16]} \
 	    -s $((${line[11]} + 1)),${line[12]} \
 	    >>"$alt_evidence.csv" 2>>"$alt_evidence.log"
