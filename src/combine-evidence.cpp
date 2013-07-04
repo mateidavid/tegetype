@@ -313,8 +313,9 @@ main(int argc, char* argv[])
 {
   prog_name = argv[0];
   {
-    char * p = getenv("GENDER");
-    if (p != NULL and *p == 'f') global::is_male = false;
+    char * p;
+    if ((p = getenv("GENDER")) != NULL and *p == 'f') global::is_male = false;
+    if ((p = getenv("FLANK_LEN")) != NULL) global::flank_len = atoi(p);
   }
 
   string ref_fasta_file;
@@ -325,7 +326,7 @@ main(int argc, char* argv[])
   string alt_evidence_file;
 
   char c;
-  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:x:th")) != -1) {
+  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:x:F:th")) != -1) {
     switch (c) {
     case 'v':
       global::verbosity++;
@@ -362,6 +363,9 @@ main(int argc, char* argv[])
 	cerr << "unrecognized gender: " << optarg << "\n";
 	exit(EXIT_FAILURE);
       }
+    case 'F':
+      global::flank_len = atoi(optarg);
+      break;
     default:
       cerr << "unrecognized option: " << c << "\n";
       usage(cerr);
@@ -382,6 +386,7 @@ main(int argc, char* argv[])
 
   if (global::verbosity >= 1) {
     clog << "gender: " << (global::is_male? "m" : "f") << "\n";
+    clog << "flank_len: [" << global::flank_len << "]\n";
   }
 
   // load pairing file

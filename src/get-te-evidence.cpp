@@ -279,12 +279,19 @@ int
 main(int argc, char* argv[])
 {
   prog_name = string(argv[0]);
-  cnp = default_cnp;
+  {
+    char * p;
+    if ((p = getenv("MIN_MQV")) != NULL) min_mqv = atoi(p);
+    if ((p = getenv("MAX_NM")) != NULL) max_nm = atoi(p);
+    if ((p = getenv("MIN_READ_LEN")) != NULL) min_read_len = atoi(p);
+    if ((p = getenv("FLANK_LEN")) != NULL) flank_len = atoi(p);
+  }
 
+  cnp = default_cnp;
   string pairing_file;
 
   char c;
-  while ((c = getopt(argc, argv, "l:t:s:q:PN:g:n:r:vh")) != -1) {
+  while ((c = getopt(argc, argv, "l:t:s:q:PN:g:n:r:F:vh")) != -1) {
     switch (c) {
     case 'l':
       pairing_file = optarg;
@@ -347,6 +354,9 @@ main(int argc, char* argv[])
     case 'r':
       min_read_len = atoi(optarg);
       break;
+    case 'F':
+      flank_len = atoi(optarg);
+      break;
     case 'N':
       global::num_threads = atoi(optarg);
       break;
@@ -400,6 +410,7 @@ main(int argc, char* argv[])
     clog << "min_mqv: [" << min_mqv << "]\n";
     clog << "max_nm: [" << max_nm << "]\n";
     clog << "min_read_len: [" << min_read_len << "]\n";
+    clog << "flank_len: [" << flank_len << "]\n";
     clog << "internal naming: [" << (cnp == default_cnp? "no" : "yes") << "]\n";
   }    
 
