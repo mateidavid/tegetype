@@ -326,7 +326,7 @@ main(int argc, char* argv[])
   string alt_evidence_file;
 
   char c;
-  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:x:F:th")) != -1) {
+  while ((c = getopt(argc, argv, "vf:g:l:L:r:a:th")) != -1) {
     switch (c) {
     case 'v':
       global::verbosity++;
@@ -354,18 +354,6 @@ main(int argc, char* argv[])
     case 'h':
       usage(cout);
       exit(EXIT_SUCCESS);
-    case 'x':
-      if (optarg[0] == 'm') {
-	global::is_male = true;
-      } else if (optarg[0] == 'f') {
-	global::is_male = false;
-      } else {
-	cerr << "unrecognized gender: " << optarg << "\n";
-	exit(EXIT_FAILURE);
-      }
-    case 'F':
-      global::flank_len = atoi(optarg);
-      break;
     default:
       cerr << "unrecognized option: " << c << "\n";
       usage(cerr);

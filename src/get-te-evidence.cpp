@@ -33,6 +33,7 @@ void (*fnp)(const string &, Clone &, int &);
 int flank_len = 30;
 int min_non_repeat = 20;
 int min_read_len = 20;
+int min_read_len_left = 20; // after removing NM from either side
 int expected_insert_size = 320; // used to place limit on allowable fragment sizes
 int min_mqv = 0;
 int max_nm = 10;
@@ -284,6 +285,7 @@ main(int argc, char* argv[])
     if ((p = getenv("MIN_MQV")) != NULL) min_mqv = atoi(p);
     if ((p = getenv("MAX_NM")) != NULL) max_nm = atoi(p);
     if ((p = getenv("MIN_READ_LEN")) != NULL) min_read_len = atoi(p);
+    if ((p = getenv("MIN_READ_LEN_LEFT")) != NULL) min_read_len_left = atoi(p);
     if ((p = getenv("FLANK_LEN")) != NULL) flank_len = atoi(p);
   }
 
@@ -291,7 +293,7 @@ main(int argc, char* argv[])
   string pairing_file;
 
   char c;
-  while ((c = getopt(argc, argv, "l:t:s:q:PN:g:n:r:F:vh")) != -1) {
+  while ((c = getopt(argc, argv, "l:t:s:PN:g:vh")) != -1) {
     switch (c) {
     case 'l':
       pairing_file = optarg;
@@ -338,24 +340,12 @@ main(int argc, char* argv[])
 	reg_end = atoi(tmp.substr(i+1).c_str());
       }
       break;
-    case 'q':
-      min_mqv = atoi(optarg);
-      break;
     case 'P':
       cnp = cloneNameParser;
       fnp = fullNameParser;
       break;
     case 'g':
       global::default_rg_name = optarg;
-      break;
-    case 'n':
-      max_nm = atoi(optarg);
-      break;
-    case 'r':
-      min_read_len = atoi(optarg);
-      break;
-    case 'F':
-      flank_len = atoi(optarg);
       break;
     case 'N':
       global::num_threads = atoi(optarg);
@@ -410,6 +400,7 @@ main(int argc, char* argv[])
     clog << "min_mqv: [" << min_mqv << "]\n";
     clog << "max_nm: [" << max_nm << "]\n";
     clog << "min_read_len: [" << min_read_len << "]\n";
+    clog << "min_read_len_left: [" << min_read_len_left << "]\n";
     clog << "flank_len: [" << flank_len << "]\n";
     clog << "internal naming: [" << (cnp == default_cnp? "no" : "yes") << "]\n";
   }    
