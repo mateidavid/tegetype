@@ -13,7 +13,7 @@ string prog_name;
 
 
 namespace global {
-  int flank_len = 20;
+  int flank_len = 30;
   bool is_male = true;
   bool check_tail_if_head_not_solid = false;
 }
@@ -211,13 +211,13 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 
   int chr_count = get_chr_count(ref_chr);
   null_allele_present = (chr_count >= 1
-			 and (//count[5] >= 5 or
+			 and (count[5] >= 2 or
 			      double(count[5]) > max(2.0, .5 * e_null_cnt)
 			      )
 			 );
 
   ins_allele_present = (chr_count >= 1
-			and ((//count[3 + tsd_to_check] >= 5 or
+			and ((count[3 + tsd_to_check] >= 2 or
 			      double(count[3 + tsd_to_check])
 			      > max(2.0, .5 * e_ins_cnt[0 + tsd_to_check])
 			      )
