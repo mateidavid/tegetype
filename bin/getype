@@ -250,9 +250,9 @@ ref_evidence=$ngs_name.$lib_name.ref-evidence
 input_files=("${orig_mappings[@]}" "$mappings_to_alt_sort.bam")
 output_files=("$ref_evidence.csv")
 stage_command () {
-    rm -f $ref_evidence.csv $ref_evidence.log
+    rm -f "$ref_evidence".csv "$ref_evidence".log.[0-9]
     while read -r -a line; do
-	make_note "processing: ${line[@]}" 2>&1 | tee -a $ref_evidence.log >&2
+	make_note "processing: ${line[@]}" 2>&1 | tee -a "$ref_evidence".log.1 >&2
 	{
 	    for f in "${orig_mappings[@]}"; do
 		local_chr_name=$(tawk "\$1==\"${line[1]}\"" \
@@ -266,7 +266,7 @@ stage_command () {
 	    # return to original name to mix with original mappings
 	    tawk '{n=split($1,a,":"); $1=a[2]":"a[8]; for(i=9;i<=n;i++) $1=":"a[i]; print}'
 	} |
-	sam-filter-nm 3>>"$ref_evidence.log" |
+	sam-filter-nm 3>>"$ref_evidence".log.2 |
 	add-dummy-pairs |
 	sam-rsort 2> >(grep -v "some paired reads" >&2 || true) |
 	add-extra-sam-flags -N 4 -l "$pairing_file" |
@@ -274,7 +274,7 @@ stage_command () {
 	get-te-evidence -l "$pairing_file" -v \
 	    -t ${line[4]},${line[5]} -t ${line[6]},${line[7]} \
 	    -s $((${line[2]} + 1)),${line[3]} \
-	    >>"$ref_evidence.csv" 2>>"$ref_evidence.log"
+	    >>"$ref_evidence".csv 2>>"$ref_evidence".log.3
     done <"$lib_csv"
 }
 run_stage
@@ -289,12 +289,12 @@ alt_evidence=$ngs_name.$lib_name.alt-evidence
 input_files=("$mappings_to_alt_sort.bam")
 output_files=("$alt_evidence.csv")
 stage_command () {
-    rm -f "$alt_evidence.csv" "$alt_evidence.log"
+    rm -f "$alt_evidence".csv "$alt_evidence".log.[0-9]
     while read -r -a line; do
-	make_note "processing: ${line[@]}" 2>&1 | tee -a "$alt_evidence.log" >&2
+	make_note "processing: ${line[@]}" 2>&1 | tee -a "$alt_evidence".log.1 >&2
 	samtools view "$mappings_to_alt_sort.bam" \
 	    ${line[10]}:$((${line[11]} + 1))-${line[12]} |
-	sam-filter-nm 3>>"$alt_evidence.log" |
+	sam-filter-nm 3>>"$alt_evidence".log.2 |
 	sam-rsort --cid-parser cid_parser \
 	    2> >(grep -v "some paired reads" >&2 || true) |
 	add-extra-sam-flags -N 4 -P -l "$pairing_file" |
@@ -302,7 +302,7 @@ stage_command () {
 	get-te-evidence -P -l "$pairing_file" -v \
 	    -t ${line[13]},${line[14]} -t ${line[15]},${line[16]} \
 	    -s $((${line[11]} + 1)),${line[12]} \
-	    >>"$alt_evidence.csv" 2>>"$alt_evidence.log"
+	    >>"$alt_evidence".csv 2>>"$alt_evidence".log.3
     done <"$lib_csv"
 }
 run_stage
