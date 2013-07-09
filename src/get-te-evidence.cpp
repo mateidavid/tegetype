@@ -76,8 +76,7 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
       }
       // discard fragment if NM too large
       if (edit_dist > max_nm) {
-	if (global::verbosity > 0)
-	  clog << "[" << v_sm[0].name << "]: discarding; large NM\n";
+	LOG(1) << "[" << v_sm[0].name << "]: discarding; large NM\n";
 	return;
       }
       if (edit_dist > 0) {
@@ -85,8 +84,7 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
 	v_m[j].dbPos[1] -= edit_dist;
       }
       if (v_m[j].dbPos[1] - v_m[j].dbPos[0] + 1 < min_read_len_left) {
-	if (global::verbosity > 0)
-	  clog << "[" << v_sm[0].name << "]: discarding; small read len after NM trim\n";
+	LOG(1) << "[" << v_sm[0].name << "]: discarding; small read len after NM trim\n";
 	return;
       }
       if (min_pos < 0 or v_m[j].dbPos[0] < min_pos) min_pos = v_m[j].dbPos[0];
@@ -99,8 +97,7 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
 	     or max_pos < 0
 	     or (min_pos > tsd[0].end - min_non_repeat
 		 and max_pos < tsd[1].start + min_non_repeat))) {
-      if (global::verbosity > 0)
-	clog << "[" << v_sm[0].name << "]: discarding: few bp mapped outside of repeat\n";
+      LOG(1) << "[" << v_sm[0].name << "]: discarding: few bp mapped outside of repeat\n";
       return;
     }
   }
@@ -127,47 +124,40 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
 	  and v_m[j].dbPos[1] >= tsd[i].end + flank_len) {
 	// captures this TSD!
 	tsd[i].count++;
-	if (global::verbosity > 0)
-	  clog << "[" << v_sm[0].name << "]: captures tsd [" << i + 1 << "]\n";
+	LOG(1) << "[" << v_sm[0].name << "]: captures tsd [" << i + 1 << "]\n";
 	//return;
       }
     }
   }
 
   if (v_sm.size() != 2) {
-    if (global::verbosity > 0)
-      clog << "[" << v_sm[0].name << "]: discarding; unpaired\n";
+    LOG(1) << "[" << v_sm[0].name << "]: discarding; unpaired\n";
     return;
   }
 
   if (v_m[0].dbPos[1] - v_m[0].dbPos[0] + 1 < min_read_len
       or v_m[1].dbPos[1] - v_m[1].dbPos[0] + 1 < min_read_len) {
-    if (global::verbosity > 0)
-      clog << "[" << v_sm[0].name << "]: discarding; one read too small\n";
+    LOG(1) << "[" << v_sm[0].name << "]: discarding; one read too small\n";
     return;
   }
 
   if (not v_sm[0].mapped or not v_sm[1].mapped) {
-    if (global::verbosity > 0)
-      clog << "[" << v_sm[0].name << "]: discarding; not both mapped\n";
+    LOG(1) << "[" << v_sm[0].name << "]: discarding; not both mapped\n";
     return;
   }
 
   if (v_sm[0].mqv < min_mqv and v_sm[1].mqv < min_mqv) {
-    if (global::verbosity > 0)
-      clog << "[" << v_sm[0].name << "]: discarding; neither read has min mqv\n";
+    LOG(1) << "[" << v_sm[0].name << "]: discarding; neither read has min mqv\n";
     return;
   }
 
   if (not v_sm[0].flags[1] or not v_sm[1].flags[1]) {
-    if (global::verbosity > 0)
-      clog << "[" << v_sm[0].name << "]: discarding; not proper pair\n";
+    LOG(1) << "[" << v_sm[0].name << "]: discarding; not proper pair\n";
     return;
   }
 
   if (v_sm[0].mqv < min_mqv or v_sm[1].mqv < min_mqv) {
-    if (global::verbosity > 0)
-      clog << "[" << v_sm[0].name << "]: discarding; one read doesn't have min mqv\n";
+    LOG(1) << "[" << v_sm[0].name << "]: discarding; one read doesn't have min mqv\n";
     return;
   }
 
@@ -212,8 +202,7 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
   // if this is the null allele and fragment length is too small, ignore
   int frag_len = pairing->get_t_len(v_m[0], 0, v_m[1], 0);
   if (tsd.size() == 1 and frag_len < pairing->mean - expected_insert_size/2) {
-    if (global::verbosity > 0)
-      clog << "[" << v_sm[0].name << "]: discarding; frag_len too small\n";
+    LOG(1) << "[" << v_sm[0].name << "]: discarding; frag_len too small\n";
     return;
   }
 
@@ -224,28 +213,24 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
   if (tsd.size() == 1) {
     if (left_end <= tsd[0].start - flank_len
 	and right_end >= tsd[0].end + flank_len) {
-      if (global::verbosity > 0)
-	clog << "[" << v_sm[0].name << "]: straddles single tsd\n";
+      LOG(1) << "[" << v_sm[0].name << "]: straddles single tsd\n";
       cluster[0][rg_idx].push_back(frag_len);
     }
   } else {
     if (left_end <= tsd[0].start - flank_len and
 	right_end >= tsd[1].end + flank_len) {
-      if (global::verbosity > 0)
-	clog << "[" << v_sm[0].name << "]: straddles both tsds\n";
+      LOG(1) << "[" << v_sm[0].name << "]: straddles both tsds\n";
 
       cluster[0][rg_idx].push_back(pairing->get_t_len(v_m[0], 0, v_m[1], 0));
     } else if (left_end <= tsd[0].start - flank_len and
 	       right_end >= tsd[0].end + flank_len and
 	       right_end <= tsd[1].start - flank_len) {
-      if (global::verbosity > 0)
-	clog << "[" << v_sm[0].name << "]: straddles left tsd\n";
+      LOG(1) << "[" << v_sm[0].name << "]: straddles left tsd\n";
       cluster[1][rg_idx].push_back(frag_len);
     } else if (left_end >= tsd[0].end + flank_len and
 	       left_end <= tsd[1].start - flank_len and
 	       right_end >= tsd[1].end + flank_len) {
-      if (global::verbosity > 0)
-	clog << "[" << v_sm[0].name << "]: straddles right tsd\n";
+      LOG(1) << "[" << v_sm[0].name << "]: straddles right tsd\n";
       cluster[2][rg_idx].push_back(frag_len);
     }
   }
@@ -387,20 +372,19 @@ main(int argc, char* argv[])
     usage(cerr);
     exit(EXIT_FAILURE);
   }
-  if (global::verbosity > 0) {
-    clog << "pairing file: [" << pairing_file << "]\n";
-    clog << "tsd 1: [" << tsd[0].start << "," << tsd[0].end << ")\n";
-    if (tsd.size() > 1) {
-      clog << "tsd 2: [" << tsd[1].start << "," << tsd[1].end << ")\n";
-    }
-    clog << "region limits: [" << reg_start << "," << reg_end << "]\n";
-    clog << "min_mqv: [" << min_mqv << "]\n";
-    clog << "max_nm: [" << max_nm << "]\n";
-    clog << "min_read_len: [" << min_read_len << "]\n";
-    clog << "min_read_len_left: [" << min_read_len_left << "]\n";
-    clog << "flank_len: [" << flank_len << "]\n";
-    clog << "internal naming: [" << (cnp == default_cnp? "no" : "yes") << "]\n";
-  }    
+
+  LOG(1) << "pairing file: [" << pairing_file << "]\n";
+  LOG(1) << "tsd 1: [" << tsd[0].start << "," << tsd[0].end << ")\n";
+  if (tsd.size() > 1) {
+    LOG(1) << "tsd 2: [" << tsd[1].start << "," << tsd[1].end << ")\n";
+  }
+  LOG(1) << "region limits: [" << reg_start << "," << reg_end << "]\n";
+  LOG(1) << "min_mqv: [" << min_mqv << "]\n";
+  LOG(1) << "max_nm: [" << max_nm << "]\n";
+  LOG(1) << "min_read_len: [" << min_read_len << "]\n";
+  LOG(1) << "min_read_len_left: [" << min_read_len_left << "]\n";
+  LOG(1) << "flank_len: [" << flank_len << "]\n";
+  LOG(1) << "internal naming: [" << (cnp == default_cnp? "no" : "yes") << "]\n";
 
   {
     igzstream mapIn(optind < argc? argv[optind] : "-");
