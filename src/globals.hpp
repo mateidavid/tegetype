@@ -38,7 +38,7 @@ namespace global {
   EXTERN_INIT(int, num_threads, 1);
 };
 
-#define for_iterable(_class, _object, _iterator) for (_class::iterator _iterator = _object.begin(); _iterator != _object.end(); ++_iterator)
+#define LOG(level) if (level <= global::verbosity) clog
 
 
 #endif

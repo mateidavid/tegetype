@@ -43,25 +43,25 @@ CloneGen::get_next()
   // create clone object containing reference mappings
   Clone* result = new Clone();
   result->name = next_ref->first;
-  for_iterable(vector<SamMapping>, next_ref->second, it) {
-    int nip;
-    fullNameParser_(it->name, *result, nip);
-    if (result->read[nip].seq.length() == 0) {
-      if (not it->mapped or it->st == 0) {
-	result->read[nip].seq = it->seq;
-	result->read[nip].qvString = it->qvString;
-      } else {
-	result->read[nip].seq = reverseComplement(it->seq);
-	result->read[nip].qvString = reverse(it->qvString);
+  for_each(next_ref->second.begin(), next_ref->second.end(), [&] (const SamMapping & sm) {
+      int nip;
+      fullNameParser_(sm.name, *result, nip);
+      if (result->read[nip].seq.length() == 0) {
+	if (not sm.mapped or sm.st == 0) {
+	  result->read[nip].seq = sm.seq;
+	  result->read[nip].qvString = sm.qvString;
+	} else {
+	  result->read[nip].seq = reverseComplement(sm.seq);
+	  result->read[nip].qvString = reverse(sm.qvString);
+	}
       }
-    }
-    if (it->mapped) {
-      Mapping m = convert_SamMapping_to_Mapping(*it);
-      m.qr = &result->read[nip];
-      m.is_ref = true;
-      result->read[nip].mapping.push_back(m);
-    }
-  }
+      if (sm.mapped) {
+	Mapping m = convert_SamMapping_to_Mapping(sm);
+	m.qr = &result->read[nip];
+	m.is_ref = true;
+	result->read[nip].mapping.push_back(m);
+      }
+    });
 
   delete next_ref;
   next_ref = NULL;
@@ -89,13 +89,14 @@ CloneGen::get_next()
 
   if (next_rep_ != NULL && !result->name.compare(next_rep_->first)) {
     // merge with reference mappings
-    for_iterable (vector<SamMapping>, next_rep_->second, it) {
-      if (it->mapped) {
-	int nip;
-	fullNameParser_(it->name, *result, nip);
-	result->read[nip].mappedToRepeatSt[it->st] = true;
-      }
-    }
+    for_each(next_rep_->second.begin(), next_rep_->second.end(),
+	     [&] (const SamMapping & sm) {
+	       if (sm.mapped) {
+		 int nip;
+		 fullNameParser_(sm.name, *result, nip);
+		 result->read[nip].mappedToRepeatSt[sm.st] = true;
+	       }
+	     });
     delete next_rep_;
     next_rep_ = NULL;
   }

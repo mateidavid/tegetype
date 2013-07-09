@@ -25,10 +25,10 @@ minEnclosingInterval(vector<Interval<T> >& v)
   Interval<T> result;
   result[0] = v[0][0];
   result[1] = v[0][1];
-  for_iterable(typename vector<Interval<T> >, v, it) {
-    result[0] = min(result[0], (*it)[0]);
-    result[1] = max(result[1], (*it)[1]);
-  }
+  for_each(v.begin(), v.end(), [&] (const Interval<T> & i) {
+      result[0] = min(result[0], i[0]);
+      result[1] = max(result[1], i[1]);
+    });
   return result;
 }
 
@@ -36,9 +36,9 @@ Interval<long long>
 minEnclosingInterval(vector<BP>& v)
 {
   vector<Interval<long long> > u;
-  for_iterable(vector<BP>, v, it) {
-    u.push_back(it->pos);
-  }
+  for_each(v.begin(), v.end(), [&] (const BP & bp) {
+      u.push_back(bp.pos);
+    });
   return minEnclosingInterval(u);
 }
 
