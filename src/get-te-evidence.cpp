@@ -412,6 +412,8 @@ main(int argc, char* argv[])
   LOG(1) << "min_read_len: [" << min_read_len << "]\n";
   LOG(1) << "min_read_len_left: [" << min_read_len_left << "]\n";
   LOG(1) << "flank_len: [" << flank_len << "]\n";
+  LOG(1) << "is_alt_allele: [" << (is_alt? "yes" : "no") << "]\n";
+  LOG(1) << "min_non_repeat_bp: [" << min_non_repeat_bp << "]\n";
   LOG(1) << "internal naming: [" << (cnp == default_cnp? "no" : "yes") << "]\n";
 
   {
