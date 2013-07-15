@@ -299,7 +299,7 @@ stage_command () {
 	    2> >(grep -v "some paired reads" >&2 || true) |
 	add-extra-sam-flags -N 4 -P -l "$pairing_file" |
 	filter-concordant -N 4 -P -l "$pairing_file" 3>/dev/null |
-	get-te-evidence -P -l "$pairing_file" -v \
+	get-te-evidence -a -f "$lib_fa" -P -l "$pairing_file" -v \
 	    -t ${line[13]},${line[14]} -t ${line[15]},${line[16]} \
 	    -s $((${line[11]} + 1)),${line[12]} \
 	    >>"$alt_evidence".csv 2>>"$alt_evidence".log.3

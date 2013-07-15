@@ -75,7 +75,7 @@ ${BIN_PATH}/get-ref-gc: get-ref-gc.o
 
 ${BIN_PATH}/get-te-evidence: get-te-evidence.o globals.o Clone.o CloneGen.o Mapping.o \
 	SamMapping.o SamMappingSetGen.o Pairing.o common.o Read.o Cigar.o \
-	DNASequence.o deep_size.o
+	DNASequence.o deep_size.o Fasta.o
 	${LD} -o $@ $+ ${LDFLAGS} -lboost_iostreams
 
 ${BIN_PATH}/combine-evidence: combine-evidence.o globals.o Pairing.o Fasta.o

@@ -11,7 +11,7 @@
 #include "SamMappingSetGen.hpp"
 #include "Pairing.hpp"
 #include "common.hpp"
-
+#include "Fasta.hpp"
 
 using namespace std;
 
@@ -31,12 +31,13 @@ vector<vector<vector<int>>> cluster;
 string (*cnp)(const string &);
 void (*fnp)(const string &, Clone &, int &);
 int flank_len = 30;
-int min_non_repeat = 20;
+int min_non_repeat_bp = 20;
 int min_read_len = 20;
 int min_read_len_left = 20; // after removing NM from either side
 int expected_insert_size = 320; // used to place limit on allowable fragment sizes
 int min_mqv = 0;
 int max_nm = 10;
+bool is_alt = false;
 int reg_start;
 int reg_end;
 int total_bp;
@@ -65,6 +66,9 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
   {
     long long min_pos = -1;
     long long max_pos = -1;
+    // count non-repeat bp
+    int non_repeat_bp = 0;
+
     for (size_t j = 0; j < v_m.size(); ++j) {
       if (!v_sm[j].mapped) continue;
       int edit_dist = 0;
@@ -89,15 +93,24 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
       }
       if (min_pos < 0 or v_m[j].dbPos[0] < min_pos) min_pos = v_m[j].dbPos[0];
       if (max_pos < 0 or v_m[j].dbPos[1] > max_pos) max_pos = v_m[j].dbPos[1];
+
+      for_each(v_m[j].db->seq[0].begin() + v_m[j].dbPos[0],
+	       v_m[j].db->seq[0].begin() + v_m[j].dbPos[1],
+	       [&] (char c) {
+		 non_repeat_bp += (c >= 'A' and c <= 'Z'? 1 : 0);
+	       });
     }
 
+    /*
     // if fragment does not capture 20bp outside of the inner repeat, ignore
     if (tsd.size() == 2
 	and (min_pos < 0
 	     or max_pos < 0
 	     or (min_pos > tsd[0].end - min_non_repeat
 		 and max_pos < tsd[1].start + min_non_repeat))) {
-      LOG(1) << "[" << v_sm[0].name << "]: discarding: few bp mapped outside of repeat\n";
+    */
+    if (non_repeat_bp < min_non_repeat_bp) {
+      LOG(1) << "[" << v_sm[0].name << "]: discarding: not enough non-repeat bp\n";
       return;
     }
   }
@@ -269,14 +282,22 @@ main(int argc, char* argv[])
     if ((p = getenv("MIN_READ_LEN")) != NULL) min_read_len = atoi(p);
     if ((p = getenv("MIN_READ_LEN_LEFT")) != NULL) min_read_len_left = atoi(p);
     if ((p = getenv("FLANK_LEN")) != NULL) flank_len = atoi(p);
+    if ((p = getenv("MIN_NON_REPEAT_BP")) != NULL) min_non_repeat_bp = atoi(p);
   }
 
   cnp = default_cnp;
   string pairing_file;
+  string fasta_file;
 
   char c;
-  while ((c = getopt(argc, argv, "l:t:s:PN:g:vh")) != -1) {
+  while ((c = getopt(argc, argv, "af:l:t:s:PN:g:vh")) != -1) {
     switch (c) {
+    case 'a':
+      is_alt = true;
+      break;
+    case 'f':
+      fasta_file = optarg;
+      break;
     case 'l':
       pairing_file = optarg;
       break;
@@ -350,6 +371,12 @@ main(int argc, char* argv[])
     exit(EXIT_FAILURE);
   }
 
+  if (is_alt) {
+    // retrieve actual sequence from fasta file
+    igzstream fasta_is(fasta_file);
+    readFasta(fasta_is, global::refDict);
+  }
+
   // load pairing file
   {
     igzstream pairing_is(pairing_file);
@@ -393,7 +420,7 @@ main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    SamMappingSetGen map_gen(&mapIn, cnp, NULL, &global::refDict, true);
+    SamMappingSetGen map_gen(&mapIn, cnp, NULL, &global::refDict, not is_alt);
     pair<string,vector<SamMapping> >* m = map_gen.get_next();
     int n_fragments = 0;
     while (m != NULL) {
