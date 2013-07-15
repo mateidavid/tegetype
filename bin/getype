@@ -87,6 +87,8 @@ export MIN_MQV=${MIN_MQV:-10}
 make_note "using MIN_MQV=$MIN_MQV"
 export FLANK_LEN=${FLANK_LEN:-30}
 make_note "using FLANK_LEN=$FLANK_LEN"
+export MIN_NON_REPEAT_BP=${MIN_NON_REPEAT_BP:-20}
+make_note "using MIN_NON_REPEAT_BP=$MIN_NON_REPEAT_BP"
 
 
 get_mappings_by_read_name() {
