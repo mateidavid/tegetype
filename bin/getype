@@ -304,7 +304,7 @@ stage_command () {
 	get-te-evidence -a -f "$lib_fa" -P -l "$pairing_file" -v \
 	    -t ${line[13]},${line[14]} -t ${line[15]},${line[16]} \
 	    -s $((${line[11]} + 1)),${line[12]} \
-	    >>"$alt_evidence".csv 2>>"$alt_evidence".log.3
+	    >>"$alt_evidence".csv 2> >(exec grep -v "added contig" >>"$alt_evidence".log.3)
     done <"$lib_csv"
 }
 run_stage
