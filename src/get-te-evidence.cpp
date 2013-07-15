@@ -94,11 +94,12 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
       if (min_pos < 0 or v_m[j].dbPos[0] < min_pos) min_pos = v_m[j].dbPos[0];
       if (max_pos < 0 or v_m[j].dbPos[1] > max_pos) max_pos = v_m[j].dbPos[1];
 
-      for_each(v_m[j].db->seq[0].begin() + v_m[j].dbPos[0],
-	       v_m[j].db->seq[0].begin() + v_m[j].dbPos[1],
-	       [&] (char c) {
-		 non_repeat_bp += (c >= 'A' and c <= 'Z'? 1 : 0);
-	       });
+      if (is_alt)
+	for_each(v_m[j].db->seq[0].begin() + v_m[j].dbPos[0],
+		 v_m[j].db->seq[0].begin() + v_m[j].dbPos[1],
+		 [&] (char c) {
+		   non_repeat_bp += (c >= 'A' and c <= 'Z'? 1 : 0);
+		 });
     }
 
     /*
@@ -109,7 +110,7 @@ process_mapping_set(const string & clone_name, vector<SamMapping> & v_sm)
 	     or (min_pos > tsd[0].end - min_non_repeat
 		 and max_pos < tsd[1].start + min_non_repeat))) {
     */
-    if (non_repeat_bp < min_non_repeat_bp) {
+    if (is_alt and non_repeat_bp < min_non_repeat_bp) {
       LOG(1) << "[" << v_sm[0].name << "]: discarding: not enough non-repeat bp\n";
       return;
     }
