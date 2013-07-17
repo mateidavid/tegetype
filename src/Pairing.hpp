@@ -81,6 +81,6 @@ ostream & operator <<(ostream &, const ReadGroupSet &);
 // return expected number of fragments fully spanning the given closed 1-based interval,
 // assuming a single allelic region
 double get_expected_complete_span(const SQDict &, const ReadGroupSet &,
-				  const string &, long long, long long);
+				  const string &, long long, long long, int = 0);
 
 #endif

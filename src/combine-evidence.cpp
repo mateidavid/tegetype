@@ -14,6 +14,7 @@ string prog_name;
 
 namespace global {
   int flank_len = 30;
+  int min_non_repeat_bp = 20;
   bool is_male = true;
   bool check_tail_if_head_not_solid = false;
 }
@@ -173,19 +174,22 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 	get_expected_complete_span(global::refDict, global::rg_set,
 				   ref_chr,
 				   ref_tsd[0][0] + 1 - global::flank_len,
-				   ref_tsd[0][1] + global::flank_len);
+				   ref_tsd[0][1] + global::flank_len,
+				   global::min_non_repeat_bp);
 
       // ins allele is alt
       e_ins_cnt[0] =
 	get_expected_complete_span(global::refDict, global::rg_set,
 				   alt_chr,
 				   alt_tsd[0][0] + 1 - global::flank_len,
-				   alt_tsd[0][1] + global::flank_len);
+				   alt_tsd[0][1] + global::flank_len,
+				   global::min_non_repeat_bp);
       e_ins_cnt[1] =
 	get_expected_complete_span(global::refDict, global::rg_set,
 				   alt_chr,
 				   alt_tsd[1][0] + 1 - global::flank_len,
-				   alt_tsd[1][1] + global::flank_len);
+				   alt_tsd[1][1] + global::flank_len,
+				   global::min_non_repeat_bp);
     }
   else // deletion
     {
@@ -194,19 +198,22 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 	get_expected_complete_span(global::refDict, global::rg_set,
 				   ref_chr,
 				   ref_tsd[0][0] + 1 - global::flank_len,
-				   ref_tsd[0][1] + global::flank_len);
+				   ref_tsd[0][1] + global::flank_len,
+				   global::min_non_repeat_bp);
       e_ins_cnt[1] =
 	get_expected_complete_span(global::refDict, global::rg_set,
 				   ref_chr,
 				   ref_tsd[1][0] + 1 - global::flank_len,
-				   ref_tsd[1][1] + global::flank_len);
+				   ref_tsd[1][1] + global::flank_len,
+				   global::min_non_repeat_bp);
 
       // null allele is alt
       e_null_cnt =
 	get_expected_complete_span(global::refDict, global::rg_set,
 				   alt_chr,
 				   alt_tsd[0][0] + 1 - global::flank_len,
-				   alt_tsd[0][1] + global::flank_len);
+				   alt_tsd[0][1] + global::flank_len,
+				   global::min_non_repeat_bp);
     }
 
   int chr_count = get_chr_count(ref_chr);
@@ -316,6 +323,7 @@ main(int argc, char* argv[])
     char * p;
     if ((p = getenv("GENDER")) != NULL and *p == 'f') global::is_male = false;
     if ((p = getenv("FLANK_LEN")) != NULL) global::flank_len = atoi(p);
+    if ((p = getenv("MIN_NON_REPEAT_BP")) != NULL) global::min_non_repeat_bp = atoi(p);
   }
 
   string ref_fasta_file;
@@ -375,6 +383,7 @@ main(int argc, char* argv[])
   if (global::verbosity >= 1) {
     clog << "gender: " << (global::is_male? "m" : "f") << "\n";
     clog << "flank_len: [" << global::flank_len << "]\n";
+    clog << "min_non_repeat_bp: [" << global::min_non_repeat_bp << "]\n";
   }
 
   // load pairing file

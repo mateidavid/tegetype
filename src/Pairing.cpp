@@ -309,7 +309,8 @@ operator << (ostream & os, const ReadGroupSet & rgs) {
 
 double
 get_expected_complete_span(const SQDict & sq_dict, const ReadGroupSet & rg_set,
-			   const string & chr, long long start_1, long long end_1)
+			   const string & chr, long long start_1, long long end_1,
+			   int min_non_repeat_bp)
 {
   if (start_1 > end_1) {
     cerr << "error: start=" << start_1 << " > end=" << end_1 << "\n";
@@ -348,6 +349,7 @@ get_expected_complete_span(const SQDict & sq_dict, const ReadGroupSet & rg_set,
 
     int count_n = 0;
     int count_gc = 0;
+    int count_non_repeat_bp = 0;
     long long first_1 = reg_start_1;
     long long last_1 = reg_start_1 - 1;
     while (last_1 < reg_end_1) {
@@ -355,13 +357,16 @@ get_expected_complete_span(const SQDict & sq_dict, const ReadGroupSet & rg_set,
       char c = ctg.seq[0][last_1 - 1];
       if (c == 'N' or c == 'n') ++count_n;
       if (c == 'G' or c == 'g' or c == 'C' or c == 'c') ++count_gc;
+      if (c == 'A' or c == 'C' or c == 'G' or c == 'T') ++count_non_repeat_bp;
       if (last_1 - first_1 + 1 > rounded_mean) {
 	c = ctg.seq[0][first_1 - 1];
 	if (c == 'N' or c == 'n') --count_n;
 	if (c == 'G' or c == 'g' or c == 'C' or c == 'c') --count_gc;
+	if (c == 'A' or c == 'C' or c == 'G' or c == 'T') --count_non_repeat_bp;
 	++first_1;
       }
-      if (last_1 - first_1 + 1 == rounded_mean) {
+      if (last_1 - first_1 + 1 == rounded_mean
+	  and count_non_repeat_bp >= min_non_repeat_bp) {
 	// process current region
 	int bin_idx = int((double(count_gc) / (rounded_mean + 1)) * 100);
 	res += rg.get_pairing()->frag_rate[bin_idx];
