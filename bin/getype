@@ -22,7 +22,7 @@ usage () {
 
 orig_mappings=()
 [ ! "${ORIG_MAPPINGS:-}" ] || eval "orig_mappings=($(echo $ORIG_MAPPINGS))"
-gender=${GENDER:-m}
+
 OPTIND=1
 while getopts "m:" OPT "$@"; do
     case $OPT in
@@ -70,7 +70,6 @@ make_note "dropping pairs mapped to different chromosomes: $(([ ${DROP_PAIRS_DIF
 
 orig_mappings_rsort=()
 [ ! "${ORIG_MAPPINGS_RSORT:-}" ] || eval "orig_mappings_rsort=($(echo $ORIG_MAPPINGS_RSORT))"
-make_note "gender: $gender"
 
 
 make_note "using NCPU=$NCPU"
@@ -136,6 +135,31 @@ for f in "${orig_mappings[@]}"; do
     sort -k 1,1nr |
     cut -f 2,3 >$(basename "$f").chr_map
 done
+
+# set gender
+get_mappings_male_region () {
+    local saw_male_chr=
+    for f in "$@"; do
+	local_male_chr=$(tawk '$1=="'${ref_male_chr}'"' <$(basename "$f").chr_map | cut -f 2)
+	[ $local_male_chr ] || continue
+	saw_male_chr=1
+	samtools view "$f" $local_male_chr:$ref_male_reg
+    done
+    [ $saw_male_chr ] || crash "did not find male-determining chromosome in mappings"
+}
+
+if [ "${GENDER:-}" ]; then
+    gender=$GENDER
+else
+    make_note "detecting gender"
+    if [ "$(get_mappings_male_region "${orig_mappings[@]}" | wc -l)" -gt 0 ]; then
+	gender=m
+    else
+	gender=f
+    fi
+    export GENDER=$gender
+fi
+make_note "using gender: $gender"
 
 
 #
