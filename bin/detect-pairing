@@ -1,0 +1,402 @@
+#!/usr/bin/env python
+import signal
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+import sys
+import operator
+import math
+import argparse
+import functools
+from lib_alu_detect import *
+import lib_alu_detect_sam as sam
+
+good_mapping_cigar_ops = 'M=XSH'
+good_mapping_max_nm_val = 2
+good_mapping_min_as_frac = .9
+good_mapping_min_mqv = 10
+default_stop_count = 10000
+drop_fraction = .001
+unmapped_count = 0
+unmapped_stop_count = 10*default_stop_count
+
+have_nm_field = -1
+have_as_field = -1
+max_as_val = 0
+
+rg_dict = {}
+header_rg_dict = {}
+target_rg = ''
+
+def save_header_rg(line):
+    a = line.strip().split('\t')
+    if (a[0][1:] != 'RG'):
+        return
+    i = 1
+    while (i < len(a) and a[i][0:2] != 'ID'):
+        i += 1
+    if (i >= len(a)):
+        crash('header line did not contain ID: ' + line)
+    header_rg_dict[a[i][3:]] = True
+    note('added RG: ' + a[i][3:], 1)
+
+
+def good_mapping(d):
+    global have_nm_field, have_as_field, max_as_val
+
+    ops = sam.parse_cigar_string(d['cigar'])
+    for op in ops:
+        if op[0] not in good_mapping_cigar_ops:
+            note('discarding mapping of [%s]: bad cigar ops [%s]' % (d['name'], d['cigar']), 2)
+            return False
+
+    if have_nm_field < 0:
+        if 'NM' in d:
+            nm_val = d['NM']
+            note('NM field detected', 1)
+            have_nm_field = 1
+        else:
+            note('NM field absent', 1)
+            have_nm_field = 0
+    elif have_nm_field == 1:
+        if 'NM' in d:
+            nm_val = d['NM']
+        else:
+            note('NM field missing [%s]' % '\t'.join(m), 1)
+            have_nm_field = 0
+    if have_nm_field == 1 and nm_val > good_mapping_max_nm_val:
+        note('discarding mapping of [%s]: bad NM value [%d]' % (d['name'], nm_val), 2)
+        return False
+
+    if have_as_field != 0 and len(rg_dict) > 1:
+        have_as_field = 0
+        note('2 or more read groups; disabling AS field', 1)
+
+    if have_as_field < 0:
+        if 'AS' in d:
+            as_val = d['AS']
+            note('AS field detected', 1)
+            have_as_field = 1
+        else:
+            note('AS field absent', 1)
+            have_as_field = 0
+    elif have_as_field == 1:
+        if 'AS' in d:
+            as_val = d['AS']
+        else:
+            note('AS field missing [%s]' % '\t'.join(m), 1)
+            have_as_field = 0
+    if have_as_field == 1 and as_val < 0:
+        note('AS field contains negative values, disabling', 1)
+        have_as_field = 0
+    if have_as_field == 1 and as_val > max_as_val:
+        max_as_val = as_val
+        note('new max AS value [%d]' % max_as_val, 1)
+    if have_as_field == 1 and as_val < max_as_val * good_mapping_min_as_frac:
+        note('discarding mapping of [%s]: bad AS value [%d]' % (d['name'], as_val), 2)
+        return False
+
+    if d['mqv'] < good_mapping_min_mqv:
+        note('discarding mapping of [%s]: bad MQV [%d]' % (d['name'], d['mqv']), 2)
+        return False
+
+    return True
+
+parser = argparse.ArgumentParser(description=sys.argv[0])
+parser.add_argument('-v', '--verbose', action='append_const', const=1, default=[], dest='verbose')
+parser.add_argument('-c', '--stop-count', action='store', type=int,
+                    default=default_stop_count, dest='stop_count')
+parser.add_argument('-f', '--ignore-flags', action='store_true', default=False, dest='ignore_flags')
+parser.add_argument('-g', '--default-rg', action='store', default='00', dest='default_rg')
+parser.add_argument('--cid-parser', action='store', dest='cid_parser')
+parser.add_argument('--trust-rg-headers', action='store_true', default=True, dest='trust_rg_headers')
+parser.add_argument('input', action='store', default='-', nargs='?')
+args = parser.parse_args()
+set_log_level(len(args.verbose))
+
+drop_count = int(args.stop_count * drop_fraction)
+note('using stop count: [%d]' % args.stop_count, 1)
+note('using drop count: [%d]' % drop_count, 1)
+ignore_flags = args.ignore_flags
+
+if int(args.stop_count / 11.0) - 2 * drop_count < 10:
+    crash('stop count not large enough')
+
+if args.cid_parser:
+    _temp = __import__(args.cid_parser, globals(), locals(), ['cid_parser'])
+    cid_parser = _temp.cid_parser
+else:
+    cid_parser = sam.default_cid_parser
+mapping_parser = functools.partial(sam.mapping_parser, cid_parser=cid_parser)
+
+in_fd = gzopen(args.input)
+
+for ms in sam.get_mapping_set_gen(in_fd, mapping_parser=mapping_parser,
+                                  header_line_hook=save_header_rg,
+                                  ignore_duplicate=False, ignore_failed_qc=False):
+    if unmapped_count >= unmapped_stop_count:
+        note('reached stop count of unmapped fragments; exiting')
+        break
+
+    # stop condition
+    if target_rg != '':
+        if (rg_dict[target_rg]['count_unpaired'] + rg_dict[target_rg]['count_paired']
+            >= args.stop_count):
+            note('done target:' + target_rg, 1)
+            target_rg = ''
+    if len(rg_dict) > 0 and target_rg == '':
+        done = True
+        for s in rg_dict:
+            if (rg_dict[s]['count_unpaired'] + rg_dict[s]['count_paired']
+                < args.stop_count):
+                done = False
+                target_rg = s
+                note('new target:' + target_rg, 1)
+                break
+        if done:
+            if (len(header_rg_dict) == 0):
+                # no headers to check; done
+                break
+            if (len(header_rg_dict) == len(rg_dict)):
+                # found all read groups mentioned in headers; done
+                break
+            if not args.trust_rg_headers:
+                # do not trust headers: if we didn't find RG so far, it's missing; crash
+                missing = []
+                for x in header_rg_dict.keys():
+                    if x not in rg_dict:
+                        missing += [x]
+                crash('did not find mappings for RGs: ' + str(missing))
+            # trust headers; continue looking for missing RGs
+
+    if len(ms) > 2:
+        crash('found mapping set with more than 2 mappings: ' + str(ms))
+
+    if len(ms) == 2:
+        if ('RG' in ms[0]) != ('RG' in ms[1]):
+            crash('RG found in some but not all reads of the same pair: ' + str(ms))
+        if 'RG' in ms[0] and (ms[0]['RG'] != ms[1]['RG']):
+            crash('reads in the same pair are in different read groups: ' + str(ms))
+
+    if 'RG' in ms[0]:
+        rg_string = ms[0]['RG']
+        if (len(header_rg_dict) > 0 and rg_string not in header_rg_dict):
+            crash(rg_string + ': RG missing from sam headers: ' + str(ms[0]))
+    else:
+        if len(header_rg_dict) > 0:
+            crash('RG sam headers present, but RG sam field missing: ' + str(ms[0]))
+        rg_string = args.default_rg
+
+    if rg_string not in rg_dict:
+        note(rg_string + ': new read group')
+        rgd = {}
+        rgd['idx'] = len(rg_dict)
+        rgd['count_unpaired'] = 0
+        rgd['count_paired'] = 0
+        # unpaired tracked stats
+        rgd['min_r_len'] = -1
+        rgd['max_r_len'] = -1
+        # paired tracked stats
+        rgd['max_r1_len'] = -1
+        rgd['max_r2_len'] = -1
+        #rgd['count_st_diff'] = [0, 0]
+        rgd['delta'] = [[], []]
+        # detected stats
+        rgd['detected_unpaired'] = False
+        rgd['detected_paired'] = False
+        rgd['detected_st_diff'] = -1
+        rgd['detected_delta_min'] = -1
+        rgd['detected_delta_max'] = -1
+        rgd['detected_delta_mean'] = -1
+        rgd['detected_delta_stddev'] = -1
+        rg_dict[rg_string] = rgd
+        unmapped_stop_count += 10*default_stop_count
+    rgd = rg_dict[rg_string]
+
+    if (rgd['count_unpaired'] + rgd['count_paired'] >= args.stop_count):
+        continue
+
+    if ms[0]['paired']:
+        if len(ms) == 1:
+            #crash('did not find pair for read: ' + str(ms))
+            note('discarding single mapping of a read pair: ' + str(ms), 2)
+            continue
+        if not ms[1]['paired']:
+            crash('inconsistent pairing flags in a pair: ' + str(ms))
+    else:
+        if len(ms) == 2:
+            crash('found more than one mapping for an unpaired read: ' + str(ms))
+
+    if not ms[0]['paired']:
+        if 'len' in ms[0]:
+            if rgd['max_r_len'] >= 0:
+                rgd['max_r_len'] = max(rgd['max_r_len'], ms[0]['len'])
+            else:
+                rgd['max_r_len'] = ms[0]['len']
+            if rgd['min_r_len'] >= 0:
+                rgd['min_r_len'] = min(rgd['min_r_len'], ms[0]['len'])
+            else:
+                rgd['min_r_len'] = ms[0]['len']
+
+        if not ms[0]['mapped']:
+            unmapped_count += 1
+            continue
+
+        rgd['count_unpaired'] += 1
+
+    else:
+        # before all, check flags
+        if not ignore_flags and not sam.check_pair_flags(ms):
+            crash('bad flags: ' + str(ms))
+
+        # order them properly
+        if ms[0]['nip'] == 1:
+            ms = ms[::-1]
+
+        # update tracked read lengths
+        if 'len' in ms[0]:
+            if rgd['max_r1_len'] >= 0:
+                rgd['max_r1_len'] = max(rgd['max_r1_len'], ms[0]['len'])
+            else:
+                rgd['max_r1_len'] = ms[0]['len']
+            if rgd['max_r2_len'] >= 0:
+                rgd['max_r2_len'] = max(rgd['max_r2_len'], ms[1]['len'])
+            else:
+                rgd['max_r2_len'] = ms[1]['len']
+
+        # count_paired, count_st_diff, and delta updated only if good mapping
+        # if either is not mapped, ignore
+        if not ms[0]['mapped'] or not ms[1]['mapped']:
+            unmapped_count += 1
+            note('discarding unmapped clone: ' + str(ms), 2)
+            continue
+        if (not ignore_flags
+            and (not sam.all_properly_aligned(ms[0]) or not sam.all_properly_aligned(ms[1]))):
+            note('discarding mappings: not all properly aligned: ' + str(ms), 2)
+            continue
+        if ms[0]['chr'] != ms[1]['chr']:
+            note('discarding mappings: different chromosomes: ' + str(ms), 2)
+            continue
+        if not good_mapping(ms[0]) or not good_mapping(ms[1]):
+            continue
+
+        # if here, the pair has good mapping
+        rgd['count_paired'] += 1
+
+        # updated tracked count_st_diff
+        st_diff = int(sam.is_reversed(ms[0]) != sam.is_reversed(ms[1]))
+        #rgd['count_st_diff'][st_diff] += 1
+
+        # update tracked delta
+        pos = [None, None]
+        [read_pos, read_clip_len] = sam.get_pos(ms[0])
+        pos[0] = [read_pos[0] - read_clip_len[0], read_pos[1] - read_clip_len[1]]
+        [read_pos, read_clip_len] = sam.get_pos(ms[1])
+        pos[1] = [read_pos[0] - read_clip_len[0], read_pos[1] - read_clip_len[1]]
+        #pos = [sam.get_pos(ms[0])[0], sam.get_pos(ms[1])[0]]
+        fivep = [pos[0][ms[0]['st']], pos[1][ms[1]['st']]]
+        delta = (fivep[1] - fivep[0]) * [1, -1][ms[0]['st']]
+        rgd['delta'][st_diff].append(delta)
+
+    # if we got here, we must have incremented either count_unpaired or count_paired
+    if (rgd['count_unpaired'] + rgd['count_paired'] < args.stop_count):
+        continue
+
+    # done with this read group; compute results
+    if rgd['count_unpaired'] > 10 * rgd['count_paired']:
+        rgd['detected_unpaired'] = True
+        note(rg_string + ': detected unpaired reads')
+    elif rgd['count_paired'] > 10 * rgd['count_unpaired']:
+        rgd['detected_paired'] = True
+        note(rg_string + ': detected paired reads')
+    else:
+        rgd['detected_unpaired'] = True
+        rgd['detected_paired'] = True
+        note(rg_string + ': detected both unpaired [%d] and paired [%d] reads'
+             % (rgd['count_unpaired'], rgd['count_paired']))
+
+    if rgd['detected_unpaired']:
+        note(rg_string + ': detected unpaired lengths min:%d max:%d'
+             % (rgd['min_r_len'], rgd['max_r_len']), 1)
+
+    if rgd['detected_paired']:
+        note(rg_string + ': detected paired lengths r1:%d r2:%d'
+             % (rgd['max_r1_len'], rgd['max_r2_len']), 1)
+
+        if len(rgd['delta'][0]) > 10 * len(rgd['delta'][1]):
+            rgd['detected_st_diff'] = 0
+        elif len(rgd['delta'][1]) > 10 * len(rgd['delta'][0]):
+            rgd['detected_st_diff'] = 1
+        else:
+            crash('could not detect st_diff, neither dominates: [%d] vs [%d]'
+                 % (len(rgd['delta'][0]), len(rgd['delta'][1])))
+        note(rg_string + ': detected st_diff:%d count0:[%d] vs count1:[%d]'
+             % (rgd['detected_st_diff'], len(rgd['delta'][0]), len(rgd['delta'][1])),
+             1)
+
+        l = rgd['delta'][rgd['detected_st_diff']]
+        l.sort()
+        if drop_count > 0:
+            l = l[drop_count:-drop_count]
+        note(rg_string + ': using %d values of delta for detection' % len(l), 1)
+        rgd['detected_delta_min'] = l[0]
+        rgd['detected_delta_max'] = l[-1]
+        rgd['detected_delta_mean'] = sum(l)/len(l)
+        rgd['detected_delta_stddev'] = math.sqrt(
+            sum(map(lambda x: x*x, l)) / (len(l) - 1)
+            - (sum(l) * sum(l)) / (len(l) * (len(l) - 1)))
+        note(rg_string + ': detected min:%d max:%d mean:%d stddev:%d' %
+             (rgd['detected_delta_min'], rgd['detected_delta_max'],
+              rgd['detected_delta_mean'], rgd['detected_delta_stddev']),
+             1)
+
+
+#gzclose(in_fd)
+
+fill = 3
+while 2 * len(rg_dict) > 10**fill:
+    fill += 1
+
+if len(header_rg_dict) > 0:
+    header_list = sorted(header_rg_dict)
+else:
+    header_list = sorted(rg_dict)
+
+idx = 0
+for k in header_list:
+    if k not in rg_dict:
+        note('no pairing info for read group [' + k + ']; using defaults')
+        rg_dict[k] = dict()
+        rg_dict[k]['max_r_len'] = -1
+        rg_dict[k]['detected_paired'] = False
+        rg_dict[k]['detected_unpaired'] = False
+    #if not rg_dict[k]['detected_paired'] and not rg_dict[k]['detected_unpaired']:
+    #    continue
+    if not rg_dict[k]['detected_paired']:
+        # use generous settings
+        rg_dict[k]['detected_st_diff'] = 1
+        rg_dict[k]['detected_delta_min'] = 0
+        rg_dict[k]['detected_delta_max'] = 1000
+        rg_dict[k]['detected_delta_mean'] = 300
+        rg_dict[k]['detected_delta_stddev'] = 100
+	if rg_dict[k]['max_r_len'] < 0:
+            rg_dict[k]['max_r_len'] = 100
+        rg_dict[k]['max_r1_len'] = rg_dict[k]['max_r_len']
+        rg_dict[k]['max_r2_len'] = rg_dict[k]['max_r_len']
+
+    #if rg_dict[k]['detected_paired']:
+    s = str(idx)
+    s = ('0' * (fill - len(s))) + s
+    print ('%s\t%s\tpaired=1,st_diff=%d,min=%d,max=%d,mean=%d,stddev=%d,r1_len=%d,r2_len=%d' %
+           (k, s,
+            rg_dict[k]['detected_st_diff'],
+            rg_dict[k]['detected_delta_min'], rg_dict[k]['detected_delta_max'],
+            rg_dict[k]['detected_delta_mean'], rg_dict[k]['detected_delta_stddev'],
+            rg_dict[k]['max_r1_len'], rg_dict[k]['max_r2_len']))
+    idx += 1
+    # elif rg_dict[k]['detected_unpaired']:
+    #     s = str(idx)
+    #     s = ('0' * (fill - len(s))) + s
+    #     print ('%s\t%s\tpaired=0,r1_len=%d,r2_len=%d' %
+    #            (k, s,
+    #             rg_dict[k]['min_r_len'], rg_dict[k]['max_r_len']))
+    #     idx += 1
