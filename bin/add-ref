@@ -85,9 +85,9 @@ else
     crash "could not parse region: $ref_male_chr"
     grep -q '^'"$ref_male_chr"'	' "$ref_fai" ||
     crash "male chromosome not found in index: $ref_male_chr"
-    [[ "$ref_reg_start" =~ ^[[:digit:]]*$ ]] ||
+    [[ "$ref_male_reg_start" =~ ^[[:digit:]]*$ ]] ||
     crash "male region start contains non-digits"
-    [[ "$ref_reg_end" =~ ^[[:digit:]]*$ ]] ||
+    [[ "$ref_male_reg_end" =~ ^[[:digit:]]*$ ]] ||
     crash "male region end contains non-digits"
     make_note "male-determining region: $ref_male_chr:$ref_male_reg"
     echo "ref_male_chr=$ref_male_chr" >"$ref_settings_sh"
