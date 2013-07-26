@@ -249,12 +249,12 @@ run_stage
 
 
 #
-# Stage 5: Sort and index alternate mappings
+# Stage 4: Sort and index alternate mappings
 #
 # Input: mappings to alternate alleles
 # Output: single file, sorted
 #
-STAGE_NUM=5
+STAGE_NUM=4
 STAGE_NAME="sort alternate mappings"
 mappings_to_alt_sort=$mappings_to_alt.merge.sort
 input_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done))
@@ -268,9 +268,9 @@ run_stage
 
 
 #
-# Stage 6: Gather evidence for reference allele
+# Stage 5: Gather evidence for reference allele
 #
-STAGE_NUM=6
+STAGE_NUM=5
 STAGE_NAME="Gather evidence for reference allele"
 ref_evidence=$ngs_name.$lib_name.ref-evidence
 input_files=("${orig_mappings[@]}" "$mappings_to_alt_sort.bam")
@@ -307,9 +307,9 @@ run_stage
 
 
 #
-# Stage 7: Gather evidence for alternate allele
+# Stage 6: Gather evidence for alternate allele
 #
-STAGE_NUM=7
+STAGE_NUM=6
 STAGE_NAME="Gather evidence for alternate allele"
 alt_evidence=$ngs_name.$lib_name.alt-evidence
 input_files=("$mappings_to_alt_sort.bam")
@@ -335,9 +335,9 @@ run_stage
 
 
 #
-# Stage 8: Compute fragment rates
+# Stage 7: Compute fragment rates
 #
-STAGE_NUM=8
+STAGE_NUM=7
 STAGE_NAME="Compute fragment rates"
 pairing_gc_rate_file=$ngs_name.$ref_name.pairing.gc-rate.csv
 input_files=("${orig_mappings[@]}" "$pairing_file")
@@ -349,9 +349,9 @@ run_stage
 
 
 #
-# Stage 9: Combine evidence
+# Stage 8: Combine evidence
 #
-STAGE_NUM=9
+STAGE_NUM=8
 STAGE_NAME="Combine evidence"
 calls=$ngs_name.$lib_name.calls
 input_files=("$pairing_gc_rate_file" "$ref_evidence.csv" "$alt_evidence.csv")
