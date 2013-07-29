@@ -252,10 +252,15 @@ stage_command () {
 	fi
     done
     exec {fd}<&-
-    samtools merge -u -h <(bam-merge-rg-headers "${input_files[@]}") - "${input_files[@]}" |
+    bam_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done))
+    if [ ${#bam_files[@]} -gt 1 ]; then
+	samtools merge -u -h <(bam-merge-rg-headers "${bam_files[@]}") - "${bam_files[@]}"
+    else
+	samtools view -u -h "${bam_files[0]}"
+    fi |
     samtools sort -m 10000000000 - "$mappings_to_alt_sort"
     samtools index "$mappings_to_alt_sort.bam"
-    rm $(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done)
+    rm "${bam_files[@]}"
 }
 run_stage
 
