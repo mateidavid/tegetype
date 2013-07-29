@@ -232,45 +232,38 @@ run_stage
 STAGE_NUM=3
 STAGE_NAME="mapping to alternate alleles"
 mappings_to_alt=$ngs_name.$lib_name.map.to_ref+alt_lib
-input_files=($(for rg in ${rg_string[@]}; do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done))
-output_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done))
-stage_command () {
-    while read -r -a line; do
-	make_note "remapping read group [${line[0]}]"
-	$PV "$reads_to_remap.${line[0]}.1.fq.gz" | zc |
-	bowtie2 -x $lib_bt2_idx -p $NCPU --phred33 --quiet \
-	    -1 - \
-	    -2 <(zc "$reads_to_remap.${line[0]}.2.fq.gz") \
-	    $(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} --rg "SM:$ngs_name" |
-	samtools view -Sb - >"$mappings_to_alt.${line[0]}.bam"
-    done <"$pairing_file"
-}
-run_stage
-
-
-#
-# Stage 4: Sort and index alternate mappings
-#
-# Input: mappings to alternate alleles
-# Output: single file, sorted
-#
-STAGE_NUM=4
-STAGE_NAME="sort alternate mappings"
 mappings_to_alt_sort=$mappings_to_alt.merge.sort
-input_files=($(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done))
+input_files=($(for rg in ${rg_string[@]}; do echo "$reads_to_remap.$rg."{1,2}".fq.gz"; done))
 output_files=("$mappings_to_alt_sort.bam")
 stage_command () {
+    local fd
+    exec {fd}<"$pairing_file"
+    while read -r -a line -u $fd; do
+	if [ ! -r "$mappings_to_alt.$rg.bam" ] ||
+	    [ "$reads_to_remap.${line[0]}.1.fq.gz" -nt "$mappings_to_alt.$rg.bam" ] ||
+	    [ "$reads_to_remap.${line[0]}.2.fq.gz" -nt "$mappings_to_alt.$rg.bam" ]; then
+	    make_note "remapping read group [${line[0]}]"
+	    $PV "$reads_to_remap.${line[0]}.1.fq.gz" | zc |
+	    bowtie2 -x $lib_bt2_idx -p $NCPU --phred33 --quiet \
+		-1 - \
+		-2 <(zc "$reads_to_remap.${line[0]}.2.fq.gz") \
+		$(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} --rg "SM:$ngs_name" |
+	    samtools view -Sb - >"$mappings_to_alt.${line[0]}.bam"
+	fi
+    done
+    exec {fd}<&-
     samtools merge -u -h <(bam-merge-rg-headers "${input_files[@]}") - "${input_files[@]}" |
     samtools sort -m 10000000000 - "$mappings_to_alt_sort"
     samtools index "$mappings_to_alt_sort.bam"
+    rm $(for rg in ${rg_string[@]}; do echo "$mappings_to_alt.$rg.bam"; done)
 }
 run_stage
 
 
 #
-# Stage 5: Gather evidence for reference allele
+# Stage 4: Gather evidence for reference allele
 #
-STAGE_NUM=5
+STAGE_NUM=4
 STAGE_NAME="Gather evidence for reference allele"
 ref_evidence=$ngs_name.$lib_name.ref-evidence
 input_files=("${orig_mappings[@]}" "$mappings_to_alt_sort.bam")
@@ -307,9 +300,9 @@ run_stage
 
 
 #
-# Stage 6: Gather evidence for alternate allele
+# Stage 5: Gather evidence for alternate allele
 #
-STAGE_NUM=6
+STAGE_NUM=5
 STAGE_NAME="Gather evidence for alternate allele"
 alt_evidence=$ngs_name.$lib_name.alt-evidence
 input_files=("$mappings_to_alt_sort.bam")
@@ -335,9 +328,9 @@ run_stage
 
 
 #
-# Stage 7: Compute fragment rates
+# Stage 6: Compute fragment rates
 #
-STAGE_NUM=7
+STAGE_NUM=6
 STAGE_NAME="Compute fragment rates"
 pairing_gc_rate_file=$ngs_name.$ref_name.pairing.gc-rate.csv
 input_files=("${orig_mappings[@]}" "$pairing_file")
@@ -349,9 +342,9 @@ run_stage
 
 
 #
-# Stage 8: Combine evidence
+# Stage 7: Combine evidence
 #
-STAGE_NUM=8
+STAGE_NUM=7
 STAGE_NAME="Combine evidence"
 calls=$ngs_name.$lib_name.calls
 input_files=("$pairing_gc_rate_file" "$ref_evidence.csv" "$alt_evidence.csv")
