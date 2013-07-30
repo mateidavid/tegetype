@@ -239,16 +239,17 @@ stage_command () {
     local fd
     exec {fd}<"$pairing_file"
     while read -r -a line -u $fd; do
+	rg=${line[0]}
 	if [ ! -r "$mappings_to_alt.$rg.bam" ] ||
-	    [ "$reads_to_remap.${line[0]}.1.fq.gz" -nt "$mappings_to_alt.$rg.bam" ] ||
-	    [ "$reads_to_remap.${line[0]}.2.fq.gz" -nt "$mappings_to_alt.$rg.bam" ]; then
-	    make_note "remapping read group [${line[0]}]"
-	    $PV "$reads_to_remap.${line[0]}.1.fq.gz" | zc |
+	    [ "$reads_to_remap.$rg.1.fq.gz" -nt "$mappings_to_alt.$rg.bam" ] ||
+	    [ "$reads_to_remap.$rg.2.fq.gz" -nt "$mappings_to_alt.$rg.bam" ]; then
+	    make_note "remapping read group [$rg]"
+	    $PV "$reads_to_remap.$rg.1.fq.gz" | zc |
 	    bowtie2 -x $lib_bt2_idx -p $NCPU --phred33 --quiet \
 		-1 - \
-		-2 <(zc "$reads_to_remap.${line[0]}.2.fq.gz") \
+		-2 <(zc "$reads_to_remap.$rg.2.fq.gz") \
 		$(get-bowtie-pairing -p "${line[2]}") --rg-id ${line[0]} --rg "SM:$ngs_name" |
-	    samtools view -Sb - >"$mappings_to_alt.${line[0]}.bam"
+	    samtools view -Sb - >"$mappings_to_alt.$rg.bam"
 	fi
     done
     exec {fd}<&-
