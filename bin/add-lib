@@ -212,7 +212,7 @@ BEGIN {
 '
 
 # create bowtie2 index
-bowtie2-build "$lib_fa" "$lib_bt2_idx"
+bowtie2-build "$ref_fa","$lib_fa" "$lib_bt2_idx"
 
 
 make_note "added te library [$1]"
