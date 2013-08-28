@@ -17,6 +17,7 @@ namespace global {
   int min_non_repeat_bp = 20;
   bool is_male = true;
   bool check_tail_if_head_not_solid = false;
+  double min_e_allele_cnt = 2.0;
 }
 
 
@@ -218,15 +219,17 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
 
   int chr_count = get_chr_count(ref_chr);
   null_allele_present = (chr_count >= 1
+			 and e_null_cnt >= global::min_e_allele_cnt
 			 and (count[5] >= 2 or
 			      double(count[5]) > max(2.0, .5 * e_null_cnt)
 			      )
 			 );
 
   ins_allele_present = (chr_count >= 1
+			and e_ins_cnt[0 + tsd_to_check] >= global::min_e_allele_cnt
 			and ((count[3 + tsd_to_check] >= 2 or
-			      double(count[3 + tsd_to_check])
-			      > max(2.0, .5 * e_ins_cnt[0 + tsd_to_check])
+			       double(count[3 + tsd_to_check])
+			       > max(2.0, .5 * e_ins_cnt[0 + tsd_to_check])
 			      )
 			     )
 			);
@@ -268,7 +271,11 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   string getype_abs = (chr_count == 2? "--": (chr_count == 1? "-X" : "XX"));
   string getype_rel = (chr_count == 2? "--": (chr_count == 1? "-X" : "XX"));
 
-  if (null_allele_present) {
+  if (e_null_cnt < global::min_e_allele_cnt
+      or e_ins_cnt[0 + tsd_to_check] < global::min_e_allele_cnt) {
+    getype_abs = "??";
+    getype_rel = "??";
+  } else if (null_allele_present) {
     getype_abs[0] = 'N';
     getype_rel[0] = null_allele_name;
     if (ins_allele_present) {
