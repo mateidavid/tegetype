@@ -18,6 +18,11 @@ namespace global {
   bool is_male = true;
   bool check_tail_if_head_not_solid = false;
   double min_e_allele_cnt = 2.0;
+
+  // if getting 0 reads on the null allele when expecting at least this many,
+  // and alternate is insertion,
+  // turn A- call into AA
+  double null_allele_homo_threshold = 10.0;
 }
 
 
@@ -261,7 +266,8 @@ process_locus(const string & lib_line, const string & ref_evidence_line,
   if (chr_count == 2 and ins_allele_present and not null_allele_present
       and count[2] == 0
       and count[5] == 0
-      and double(count[3 + tsd_to_check]) > 1.5 * e_ins_cnt[0 + tsd_to_check])
+      and (double(count[3 + tsd_to_check]) > 1.5 * e_ins_cnt[0 + tsd_to_check]
+	   or (is_insertion and e_null_cnt >= global::null_allele_homo_threshold)))
     null_allele_absent = true;
 
   cout << locus_name << "\t" << (is_insertion? "I" : "D") << "\t";
