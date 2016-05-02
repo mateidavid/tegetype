@@ -1,0 +1,148 @@
+#!/usr/bin/env python
+
+import sys
+import operator
+from collections import defaultdict
+import lib_alu_detect_sam as sam
+
+
+def process_cluster():
+    if total_support < 10:
+        print >> sys.stderr, 'total support < 10; ignoring'
+        return
+
+    # if either ins_start or ins_end have (>=10 and >=60%) support for one position
+    # then use that position only
+    for d in [ins_start, ins_end]:
+        if len(d) <= 1:
+            continue
+        list_items = d.items()
+        list_vals = map(operator.itemgetter(1), list_items)
+        max_val = max(list_vals)
+        if max_val >= 10 and max_val >= sum(list_vals) * .6:
+            max_idx = list_vals.index(max_val)
+            max_key = list_items[max_idx][0]
+            for k in d.keys():
+                if k == max_key:
+                    continue
+                del d[k]
+
+    if len(ins_start) > 1 and len(ins_end) > 1:
+        print >> sys.stderr, 'cluster with multiple ins_start/ins_end pairs: [%s,%s,%s,%d]; ignoring' % (crt_chr, crt_cluster, strand, total_support)
+        print >> sys.stderr, 'ins_start: ' + str(ins_start)
+        print >> sys.stderr, 'ins_end: ' + str(ins_end)
+        return
+
+    if len(ins_start) == 0 and len(ins_end) == 0:
+        print >> sys.stderr, 'cluster with no ins_start or ins_end: [%s,%s,%s]; ignoring' % (crt_chr, crt_cluster, strand)
+        return
+
+    if len(ins_start) > 0:
+        max_ins_start = max(ins_start.keys())
+    if len(ins_end) > 0:
+        min_ins_end = min(ins_end.keys())
+
+    if len(ins_start) == 0:
+        max_ins_start = min_ins_end + 50
+    if len(ins_end) == 0:
+        min_ins_end = max_ins_start - 50
+
+    best_family = ''
+    for family in te_family:
+        if (best_family == ''
+            or te_family[family] > te_family[best_family]
+            or (te_family[family] == te_family[best_family] and family > best_family)):
+            best_family = family
+
+    print >> sys.stderr, 'cluster: [%s,%s,%s]' % (crt_chr, crt_cluster, strand)
+    print >> sys.stderr, 'ins_start: ' + str(ins_start)
+    print >> sys.stderr, 'max_ins_start: ' + str(max_ins_start)
+    print >> sys.stderr, 'ins_end: ' + str(ins_end)
+    print >> sys.stderr, 'min_ins_end: ' + str(min_ins_end)
+    print >> sys.stderr, 'te_start: ' + str(te_start)
+    print >> sys.stderr, 'te_end: ' + str(te_end)
+    print >> sys.stderr, 'te_family: ' + str(te_family)
+    print >> sys.stderr, 'best_family: ' + best_family
+
+    if strand == '+':
+        seq = alus['Alu' + best_family][te_start - 1:te_end]
+    else:
+        seq = sam.reverse_complement(alus['Alu' + best_family][te_end - 1:te_start])
+
+    print '\t'.join([crt_chr, str(max_ins_start), str(min_ins_end), '.',
+                     best_family + strand + ':' + str(te_start) + '-' + str(te_end),
+                     seq,
+                     'ins_david', ','.join(samples), ','.join(populations),
+                     str(total_support)])
+
+
+alus_file = open(sys.argv[1], "r")
+alus = dict()
+crt_alu = ''
+for line in alus_file:
+    line = line.strip()
+    if line[0] == '>':
+        crt_alu = line[1:]
+        alus[crt_alu] = ''
+    else:
+        alus[crt_alu] += line
+alus_file.close()
+for crt_alu in alus.keys():
+    print >> sys.stderr, crt_alu + '\t' + alus[crt_alu]
+
+
+crt_chr = ''
+crt_cluster = ''
+
+for line in sys.stdin:
+    line = line.strip().split('\t')
+
+    if line[0] != crt_chr or line[15] != crt_cluster:
+        # print current cluster
+        if crt_chr != '':
+            process_cluster()
+
+        # start new cluster
+        crt_chr = line[0]
+        crt_cluster = line[15]
+        strand = line[5]
+        total_support = 0
+        samples = list()
+        populations = list()
+        te_start = -1
+        te_end = -1
+        ins_start = defaultdict(lambda: 0)
+        ins_end = defaultdict(lambda: 0)
+        te_family = defaultdict(lambda: 0)
+        print >> sys.stderr, '---------- new cluster: %s, %s' % (crt_chr, crt_cluster)
+
+    if line[5] != strand:
+        print >> sys.stderr, 'cluster with different strands: %s, %s' % (crt_chr, crt_cluster)
+        sys.exit(1)
+
+    total_support += int(line[8])
+    samples.append(line[13])
+    if line[14] != '' and line[14] not in populations:
+        populations.append(line[14])
+    if (te_start < 0 or (strand == '+' and int(line[6]) < te_start)
+        or (strand == '-' and int(line[6]) > te_start)):
+        te_start = int(line[6])
+    if (te_end < 0 or (strand == '+' and int(line[7]) > te_end)
+        or (strand == '-' and int(line[7]) < te_end)):
+        te_end = int(line[7])
+
+    if int(line[11]) < 0:
+        # both breakpoints detected, but in wrong order
+        ins_start[int(line[1]) + 1] += int(line[9])
+        ins_end[int(line[2]) - 1] += int(line[10])
+    else:
+        if int(line[9]) > 0:
+            ins_start[int(line[2]) - 1] += int(line[9])
+        if int(line[10]) > 0:
+            ins_end[int(line[1]) + 1] += int(line[10])
+
+    n_families = len(line[3].split(','))
+    for family in line[3].split(','):
+        te_family[family] += 1.0/n_families
+
+process_cluster()

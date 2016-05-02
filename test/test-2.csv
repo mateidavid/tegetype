@@ -1,0 +1,8 @@
+test	150	160	250	260	*	.
+test	150	160	350	360	*	.
+test	50	60	150	160	*	.
+test	50	60	350	360	*	.
+test	150	150	250	250	*	.
+test	150	160	.	.	ACGTACGTNN	.
+test	50	60	.	.	ACGTACGTNN	.
+test	350	360	.	.	ACGTACGTNN	.

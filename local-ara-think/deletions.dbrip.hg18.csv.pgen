@@ -1,0 +1,7 @@
+#!/usr/bin/env gen-file
+##
+cut -f 2- /filer/alu-detect-final/results-others/dbrip.csv | tawk '{s=$13; gsub(/<br>/,"",s); gsub(/<\/?u>/,"",s); gsub(/<\/font></,"<",s); gsub(/<\/?font[^>]*>/,"\t",s); $13=s; print}' | tawk '$3-$2>=150' \
+  | intersectBed -s -u -f .50 -a /filer/alu-detect-final/data/alus.tsd.hg18.bed -b - \
+  | tawk '$3-$2>=150' \
+  | tawk '($6=="+" && $9==0 && $11<20) || ($6=="-" && $9<20 && $11==0) {if ($6=="+") {$3+=$11} else {$2-=$9}; print}' \
+  | tawk '{print $1, $2-$10, $2, $3, $3+$12, "", "del_dbrip", "."}'

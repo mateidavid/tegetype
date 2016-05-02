@@ -1,0 +1,8 @@
+#!/usr/bin/env gen-file
+##
+tail -n +1 /filer/alu-detect-final/results-others/stewart.csv | tawk '$5=="ALU" && $7=="DEL"' | tawk '{print "chr" $1, $2, $3, 0, 0, $6, $10}' \
+  | intersectBed -s -wao -f .50 -a /filer/alu-detect-final/data/alus.tsd.hg18.bed -b - \
+  | grep -v '[-]1' \
+  | tawk '$3-$2>=150' \
+  | tawk '($6=="+" && $9==0 && $11<20) || ($6=="-" && $9<20 && $11==0) {if ($6=="+") {$3+=$11} else {$2-=$9}; print}' \
+  | tawk '{print $1, $2-$10, $2, $3, $3+$12, "", "del_stewart", $19}'

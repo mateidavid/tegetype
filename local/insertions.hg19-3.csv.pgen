@@ -1,0 +1,10 @@
+#!/usr/bin/env gen-file
+##
+
+filter-ci-length 100 \
+    </data/matei/projects/alu-detect/revision-1.1/results-us/calls.hg19.pop.bed |
+sort -s -k 1,1 -k 2,2n -k 14,14 |
+bedtools cluster -s |
+sort -s -k 1,1 -k 16,16n |
+./merge-clusters /filer/alu-detect-final/data/alus.pos.fa |
+sort -s -k 1,1 -k 2,2n

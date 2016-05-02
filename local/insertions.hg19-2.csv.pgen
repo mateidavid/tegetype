@@ -1,0 +1,32 @@
+#!/usr/bin/env gen-file
+##
+runs="ERX009608 ERX009609 ERX009610 ERX069504 ERX069505 ERX069506 SRX083314"
+for run in $runs; do
+    f=/data/matei/experiment/$run/*.hg18.calls.filtered.bed
+    ngs_sample=$(basename $f)
+    ngs_sample=${ngs_sample%%-*}
+    sed "s/\$/\t$ngs_sample/" <$f
+done \
+    | filter-ci-length 100 \
+    | sort -s -k 1,1 -k 2,2n -k 14,14 \
+    | bedtools cluster -s \
+    | sort -s -k 1,1 -k 15,15n \
+    | ./merge-clusters /filer/alu-detect-final/data/alus.pos.fa \
+    | tawk '{$5=$5 "\t+\t+"; if ($2<$3) {$5=$5 "\t0"} else {$5=$5 "\t1"; tmp=$2;$2=$3;$3=tmp}; print}' \
+    | tawk '{print $0, $3-$2}' \
+    | hg18-to-hg19 2>/dev/null \
+    | tawk '$NF==$3-$2 {NF-=1; print}' \
+    | tawk '$8=="1" {$8="0"; tmp=$2;$2=$3;$3=tmp} 1' \
+    | python <(cat <<-"EOF"
+	import sys
+	import lib_alu_detect_sam as sam
+
+	for line in sys.stdin:
+	    line = line.strip().split("\t")
+	    if line[5] == "-":
+	        line[8] = sam.reverse_complement(line[8])
+	    print "\t".join(line)
+EOF
+) \
+    | cut -f 1-5,9- \
+    | sort -s -k 1,1 -k 2,2n

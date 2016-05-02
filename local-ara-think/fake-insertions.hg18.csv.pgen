@@ -1,0 +1,20 @@
+#!/usr/bin/env gen-file
+##
+ref_fa=~/data/hg18/hg18.fa
+ref_fai=~/data/hg18/hg18.fa.fai
+
+./random-genomic-intervals $ref_fai |
+while read -r -a line; do
+    seq=$(samtools faidx $ref_fa ${line[0]}:$((${line[1]} + 1))-${line[2]} |
+	tail -n +2)
+    print_tab -- "${line[@]}" "$seq" >&2
+    [[ ! $seq =~ [acgtnN] ]] ||
+    {
+	echo "${line[@]}: skipping" >&2
+	continue
+    }
+    print_tab "${line[@]}" "AluY:$(if [ $(($RANDOM % 2)) -eq 0 ]; then echo "+"; else echo "-"; fi)" |
+    ./replace-seqname-by-seq |
+    tawk '{print $1, $3, $2, ".", ".", $4, "fake_ins", "."}'
+done |
+head -n 100

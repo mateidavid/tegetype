@@ -1,0 +1,14 @@
+#!/usr/bin/env gen-file
+##
+runs="ERX009608 ERX009609 ERX009610 ERX069504 ERX069505 ERX069506 SRX083314"
+for run in $runs; do
+    f=/data/matei/experiment/$run/*.hg18.calls.filtered.bed
+    ngs_sample=$(basename $f)
+    ngs_sample=${ngs_sample%%-*}
+    sed "s/\$/\t$ngs_sample/" <$f
+done \
+    | filter-ci-length 100 \
+    | sort -s -k 1,1 -k 2,2n \
+    | bedtools cluster -s \
+    | sort -s -k 1,1 -k 15,15n \
+    | ./merge-clusters /filer/alu-detect-final/data/alus.pos.fa

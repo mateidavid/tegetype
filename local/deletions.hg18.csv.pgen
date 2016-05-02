@@ -1,0 +1,6 @@
+#!/usr/bin/env gen-file
+##deletions.dbrip.hg18.csv deletions.stewart.hg18.csv
+cat deletions.stewart.hg18.csv deletions.dbrip.hg18.csv \
+    | sort -s -k 1,1 -k 2,2n \
+    | bedtools groupby -g 1,2,3,4,5,6 -c 7,8 -o collapse,collapse \
+    | sed 's/,\.//; s/\.,//'

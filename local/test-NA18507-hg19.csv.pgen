@@ -1,0 +1,36 @@
+#!/usr/bin/env gen-file
+#poly-alus.hg19.csv
+in=poly-alus.hg19.csv
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="del_stewart" && match($8,"NA18507") && $2==$3' \
+    | sort -t '	' -k 9,9nr | head -n 1
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="del_stewart" && match($8,"NA18507") && $2<$3-10' \
+    | sort -t '	' -k 9,9nr | head -n 1
+
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="del_stewart" && !match($8,"NA18507") && $2==$3' \
+    | sort -t '	' -k 9,9nr | tail -n 1
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="del_stewart" && !match($8,"NA18507") && $2<$3-10' \
+    | sort -t '	' -k 9,9nr | tail -n 1
+
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="ins_david" && match($8,"NA18507") && $2>$3' \
+    | sort -t '	' -k 9,9nr | head -n 1
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="ins_david" && match($8,"NA18507") && $2==$3' \
+    | sort -t '	' -k 9,9nr | head -n 1
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="ins_david" && match($8,"NA18507") && $2<$3' \
+    | sort -t '	' -k 9,9nr | head -n 1
+
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="ins_david" && !match($8,"NA1850.") && $2>$3' \
+    | sort -t '	' -k 9,9nr | tail -n 1
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="ins_david" && !match($8,"NA1850.") && $2==$3' \
+    | sort -t '	' -k 9,9nr | tail -n 1
+<$in tawk '{n=split($8,a,","); print $0, n}' \
+    | tawk '$7=="ins_david" && !match($8,"NA1850.") && $2<$3' \
+    | sort -t '	' -k 9,9nr | tail -n 1
